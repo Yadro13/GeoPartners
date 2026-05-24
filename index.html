@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мини Гео-Портал</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Подключаем Leaflet.js через надежный CDN Cloudflare -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <!-- Подключаем плагин для измерения расстояний (линейка) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css" />
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>Управление участками</h2>
+        <p>Формируйте и сохраняйте сводную базу данных участков.</p>
+        
+        <input type="file" id="importDbFile" accept=".json,.geojson" style="display: none;" onchange="importDatabase(event)">
+        <button class="btn" style="background-color: #3b82f6; margin-bottom: 10px;" onclick="document.getElementById('importDbFile').click()">📂 Загрузить базу (data.json)</button>
+        
+        <input type="file" id="addPlotsFile" accept=".json,.geojson" multiple style="display: none;" onchange="addPlots(event)">
+        <button class="btn" style="background-color: #10b981; margin-bottom: 10px;" onclick="document.getElementById('addPlotsFile').click()">➕ Добавить участки</button>
+        
+        <button class="btn" style="background-color: #f59e0b; margin-bottom: 10px;" onclick="exportDatabase()">💾 Сохранить карту</button>
+        
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+        
+        <button class="btn" onclick="toggleAccordion('categoriesAccordion')" style="background-color: #64748b; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;"><span>🏷 Настройки категорий</span><span>▾</span></button>
+        <div id="categoriesAccordion" style="display: none; background: white; padding: 15px 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
+            <div id="categoriesSettingsList"></div>
+            <button class="btn" style="background-color: #10b981; padding: 6px; font-size: 13px; margin-top: 10px;" onclick="addNewCategory()">➕ Добавить категорию</button>
+        </div>
+
+        <button id="generateReportBtn" class="btn">Сформировать отчет</button>
+        
+        <div id="reportContainer" class="report-container">
+            <!-- Сюда будет выводиться сводный отчет -->
+        </div>
+
+        <h3 style="margin-top: 20px; font-size: 16px;">Загруженные участки:</h3>
+        <input type="text" id="searchInput" placeholder="🔍 Поиск по номеру или владельцу..." style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;" onkeyup="updatePlotsList()">
+        <div id="plotsList" style="font-size: 13px; color: #475569; max-height: 250px; overflow-y: auto; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">Нет участков</div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Подключаем библиотеку для чтения PDF прямо в браузере -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- Скрипт линейки -->
+    <script src="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.js"></script>
+    <!-- Логируем ошибки в консоль (без прерывания работы всплывающими окнами) -->
+    <script>window.onerror = function(msg, url, line) { if (msg !== 'Script error.') console.error('Критическая ошибка JS: ' + msg + ' (строка ' + line + ')'); }</script>
+    <!-- Подключаем логику портала -->
+    <script src="app.js"></script>
+</body>
+</html>
