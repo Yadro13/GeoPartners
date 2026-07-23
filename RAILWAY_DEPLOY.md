@@ -19,7 +19,7 @@ Add a Railway Storage Bucket and expose its generated S3 variables to the `backu
 - Services: `geopartners-web`, `Postgres`, `geopartners-backup`, `geopartners-notifications`, and staging-only `mailpit`.
 - Bucket: `geopartners-documents`, region `ams`.
 
-The staging web service was deployed directly from the local workspace and is not linked to a GitHub branch yet. Link the production service only after the application files have been reviewed and committed.
+The staging web, notification, and backup services are linked to `Yadro13/GeoPartners` and automatically deploy from `main`. Their Railway config paths are `/railway.json`, `/railway.notifications.json`, and `/railway.backup.json` respectively. Direct `railway up` uploads are reserved for recovery when the GitHub integration is unavailable.
 
 The active staging SMTP relay is Brevo in both the web and notification services. Mailpit remains as a private staging-only service until the password-reset flow has also been exercised against Brevo; it is no longer referenced by the active application SMTP variables. Google OAuth and the private Telegram administrator channel are configured for staging.
 
