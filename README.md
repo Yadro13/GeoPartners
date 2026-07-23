@@ -40,6 +40,7 @@ npm run test:e2e
 - [Інструкція користувача](docs/USER_GUIDE.md)
 - [Інструкція адміністратора](docs/ADMIN_GUIDE.md)
 - [Приймальний чек-лист](docs/ACCEPTANCE_CHECKLIST.md)
+- [Backlog тестового середовища](docs/STAGING_BACKLOG.md)
 - [Питання до замовника](docs/CUSTOMER_QUESTIONS.md)
 
 Секрети зберігаються лише у змінних Railway або локальному `.env.local`. Архіви БД, завантажені документи та реальні облікові дані не додаються до Git.

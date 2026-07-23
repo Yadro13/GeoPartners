@@ -43,6 +43,7 @@
 ## Експлуатація
 
 - [x] Railway web, PostgreSQL, notification worker, backup cron і Bucket.
+- [x] Розділено гілки розгортання: `staging` для тестового середовища, `main` для production.
 - [x] Щотижневий custom backup PostgreSQL.
 - [x] Автоматичне видалення архівів старше 90 днів.
 - [x] Перевірка цілісності архіву перед завантаженням.
@@ -60,4 +61,5 @@
 - [x] Railway deployment runbook.
 - [x] Backup/restore runbook.
 - [x] Реєстр відкритих питань до замовника.
+- [x] Зафіксовано staging-backlog і порядок перенесення перевіреного стану в production.
 - [ ] Фінальна приймальна перевірка на production-домені.

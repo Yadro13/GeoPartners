@@ -1,5 +1,5 @@
-plots/
-data.json
+/plots/
+/data.json
 .next/
 node_modules/
 .env

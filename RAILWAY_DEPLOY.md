@@ -19,7 +19,7 @@ Add a Railway Storage Bucket and expose its generated S3 variables to the `backu
 - Services: `geopartners-web`, `Postgres`, `geopartners-backup`, `geopartners-notifications`, and staging-only `mailpit`.
 - Bucket: `geopartners-documents`, region `ams`.
 
-The staging web, notification, and backup services are linked to `Yadro13/GeoPartners` for manual redeploys, while the production instances own the automatic `main` branch trigger to avoid duplicate deployments. Their Railway config paths are `/railway.json`, `/railway.notifications.json`, and `/railway.backup.json` respectively. Direct `railway up` uploads are reserved for recovery when the GitHub integration is unavailable.
+The staging web, notification, and backup services deploy automatically from the `staging` branch. Their Railway config paths are `/railway.json`, `/railway.notifications.json`, and `/railway.backup.json` respectively. Direct `railway up` uploads are reserved for recovery when the GitHub integration is unavailable.
 
 ## Current production
 
@@ -31,6 +31,16 @@ The staging web, notification, and backup services are linked to `Yadro13/GeoPar
 - GitHub App repository access and the `main` branch triggers were verified on 2026-07-23.
 
 Production was created from the staging configuration on 2026-07-23. PostgreSQL data and Bucket objects remain isolated between environments. The Railway production domain is active and is configured as `APP_URL` and `BETTER_AUTH_URL`.
+
+## Release strategy
+
+- `staging` is the active development, integration, and acceptance environment.
+- The Git branch `staging` is the source for automatic staging deployments.
+- The Git branch `main` is the source for automatic production deployments and remains frozen between approved releases.
+- Tested code is promoted from `staging` to `main` only after the relevant staging acceptance checks pass.
+- Production PostgreSQL and Bucket data are not synchronized continuously.
+- The final staging-to-production data transfer will run only after the customer resolves the open overlap, report, and domain questions and the resulting changes pass staging acceptance.
+- The transfer must include PostgreSQL records and referenced Bucket objects, followed by production authentication, notification, document, report, and backup checks.
 
 The active staging SMTP relay is Brevo in both the web and notification services. Mailpit remains as a private staging-only service until the password-reset flow has also been exercised against Brevo; it is no longer referenced by the active application SMTP variables. Google OAuth and the private Telegram administrator channel are configured for staging.
 
