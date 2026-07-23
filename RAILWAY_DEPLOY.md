@@ -19,7 +19,17 @@ Add a Railway Storage Bucket and expose its generated S3 variables to the `backu
 - Services: `geopartners-web`, `Postgres`, `geopartners-backup`, `geopartners-notifications`, and staging-only `mailpit`.
 - Bucket: `geopartners-documents`, region `ams`.
 
-The staging web, notification, and backup services are linked to `Yadro13/GeoPartners` and automatically deploy from `main`. Their Railway config paths are `/railway.json`, `/railway.notifications.json`, and `/railway.backup.json` respectively. Direct `railway up` uploads are reserved for recovery when the GitHub integration is unavailable.
+The staging web, notification, and backup services are linked to `Yadro13/GeoPartners` for manual redeploys, while the production instances own the automatic `main` branch trigger to avoid duplicate deployments. Their Railway config paths are `/railway.json`, `/railway.notifications.json`, and `/railway.backup.json` respectively. Direct `railway up` uploads are reserved for recovery when the GitHub integration is unavailable.
+
+## Current production
+
+- Environment: `production`.
+- Application: `https://geopartners-web-production.up.railway.app`.
+- Source: `Yadro13/GeoPartners`, branch `main`.
+- Services: `geopartners-web`, `geopartners-notifications`, `geopartners-backup`, PostgreSQL, Mailpit, and an isolated Bucket instance.
+- Automatic deploys: enabled for web, notifications, and backup; each service uses its dedicated Railway config file.
+
+Production was created from the staging configuration on 2026-07-23. PostgreSQL data and Bucket objects remain isolated between environments. The Railway production domain is active and is configured as `APP_URL` and `BETTER_AUTH_URL`.
 
 The active staging SMTP relay is Brevo in both the web and notification services. Mailpit remains as a private staging-only service until the password-reset flow has also been exercised against Brevo; it is no longer referenced by the active application SMTP variables. Google OAuth and the private Telegram administrator channel are configured for staging.
 
