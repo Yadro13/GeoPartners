@@ -1,0 +1,100 @@
+.pending-page {
+  align-items: center;
+  background: var(--surface-soft);
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 20px;
+}
+
+.pending-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  max-width: 500px;
+  padding: 32px;
+  text-align: center;
+  width: 100%;
+}
+
+.pending-panel > .brand-mark {
+  margin-bottom: 28px;
+}
+
+.pending-icon {
+  align-items: center;
+  background: #e8f2eb;
+  color: var(--green);
+  display: flex;
+  height: 58px;
+  justify-content: center;
+  margin: 0 auto 16px;
+  width: 58px;
+}
+
+.pending-panel h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.pending-panel > p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 10px auto 22px;
+  max-width: 390px;
+}
+
+.pending-comment {
+  background: #f7f1e8;
+  border-left: 3px solid var(--amber);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 18px 0;
+  padding: 12px;
+  text-align: left;
+}
+
+.pending-comment span,
+.pending-steps span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pending-steps {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 16px 0;
+  text-align: left;
+}
+
+.pending-steps span {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+}
+
+.pending-panel a {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+@media (max-width: 520px) {
+  .pending-page {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .pending-panel {
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px 20px;
+  }
+}
