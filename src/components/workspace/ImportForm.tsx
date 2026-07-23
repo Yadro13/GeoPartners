@@ -1,18 +1,29 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileJson, FileText, ListChecks, LocateFixed, RefreshCw, RotateCcw, Square, Upload, WandSparkles, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileArchive, FileJson, FileText, ListChecks, LocateFixed, RefreshCw, RotateCcw, Square, Upload, WandSparkles, XCircle } from "lucide-react";
 import { MapCanvas } from "@/components/map/MapCanvas";
+import { expandImportSelection } from "@/lib/import-archive";
 import { applySafeGeometryRepairs, buildReviewedImportFiles, inspectImportPackage, setAllImportCandidatesIncluded, setImportCandidateIncluded, type ImportReview } from "@/lib/import-review";
 import type { CategoryDefinition } from "@/data/demo";
 import type { BaseMapId, PlotFeature } from "./types";
 
 export function ImportForm({ onImport, onCancel, existingPlots, categories, baseMap }: { onImport: (files: File[]) => Promise<void>; onCancel: () => void; existingPlots: PlotFeature[]; categories: Record<string, CategoryDefinition>; baseMap: BaseMapId }) {
-  const input = useRef<HTMLInputElement>(null); const [files, setFiles] = useState<File[]>([]); const [review, setReview] = useState<ImportReview | null>(null); const [repairBackup, setRepairBackup] = useState<ImportReview | null>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
+  const input = useRef<HTMLInputElement>(null); const [files, setFiles] = useState<File[]>([]); const [archiveNames, setArchiveNames] = useState<string[]>([]); const [skippedEntries, setSkippedEntries] = useState<string[]>([]); const [review, setReview] = useState<ImportReview | null>(null); const [repairBackup, setRepairBackup] = useState<ImportReview | null>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
   const geoCount = files.filter((file) => /\.(geo)?json$/i.test(file.name)).length; const pdfCount = files.filter((file) => /\.pdf$/i.test(file.name)).length;
   const analyze = async () => { setError(""); setLoading(true); try { if (!geoCount) throw new Error("Додайте GeoJSON з координатами ділянки."); const result = await inspectImportPackage(files, existingPlots, categories); setReview(result); setRepairBackup(null); setSelectedId(result.candidates[0]?.plot.properties.id ?? null); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не вдалося проаналізувати файли."); } finally { setLoading(false); } };
   const confirm = async () => { if (!review) return; setError(""); setLoading(true); try { await onImport(buildReviewedImportFiles(review, files)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не вдалося імпортувати файли."); setLoading(false); } };
-  const selectFiles = (next: File[]) => { setFiles(next); setReview(null); setRepairBackup(null); setError(""); };
+  const selectFiles = async (next: File[]) => {
+    setReview(null); setRepairBackup(null); setError(""); setLoading(true);
+    try {
+      const expanded = await expandImportSelection(next);
+      setFiles(expanded.files); setArchiveNames(expanded.archiveNames); setSkippedEntries(expanded.skippedEntries);
+    } catch (reason) {
+      setFiles([]); setArchiveNames([]); setSkippedEntries([]); setError(reason instanceof Error ? reason.message : "Не вдалося розпакувати вибрані файли.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const changeFiles = () => { setReview(null); setRepairBackup(null); };
   const applyRepairs = () => { if (!review) return; setRepairBackup(review); setReview(applySafeGeometryRepairs(review, existingPlots)); };
   const undoRepairs = () => { if (!repairBackup) return; setReview(repairBackup); setRepairBackup(null); };
@@ -47,9 +58,9 @@ export function ImportForm({ onImport, onCancel, existingPlots, categories, base
   }
 
   return <div className="import-form">
-    <input ref={input} hidden type="file" accept=".json,.geojson,.pdf,application/geo+json,application/json,application/pdf" multiple onChange={(event) => selectFiles(Array.from(event.target.files ?? []))} />
-    <button className="file-drop" type="button" onClick={() => input.current?.click()}><Upload size={26} /><strong>Вибрати GeoJSON і PDF</strong><span>Файли однієї ділянки можна назвати однаково; кадастрові номери буде перевірено</span></button>
-    {files.length ? <><div className="import-summary"><span>{geoCount} GeoJSON</span><span>{pdfCount} PDF</span></div><div className="import-files">{files.map((file) => <div key={`${file.name}-${file.size}`}>{/\.pdf$/i.test(file.name) ? <FileText size={18} /> : <FileJson size={18} />}<span>{file.name}</span><small>{formatBytes(file.size)}</small></div>)}</div></> : null}
+    <input ref={input} hidden type="file" accept=".json,.geojson,.pdf,.zip,application/geo+json,application/json,application/pdf,application/zip" multiple onChange={(event) => { void selectFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+    <button className="file-drop" disabled={loading} type="button" onClick={() => input.current?.click()}><Upload size={26} /><strong>{loading ? "Розпакування архіву…" : "Вибрати GeoJSON, PDF або ZIP"}</strong><span>ZIP буде розпаковано, а файли пройдуть таку саму перевірку пар і кадастрових номерів</span></button>
+    {files.length ? <><div className="import-summary">{archiveNames.length ? <span><FileArchive size={14} />{archiveNames.length} ZIP</span> : null}<span>{geoCount} GeoJSON</span><span>{pdfCount} PDF</span></div>{archiveNames.length ? <div className="import-archive-source"><FileArchive size={17} /><span>Розпаковано: {archiveNames.join(", ")}</span></div> : null}<div className="import-files">{files.map((file) => <div key={`${file.name}-${file.size}`}>{/\.pdf$/i.test(file.name) ? <FileText size={18} /> : <FileJson size={18} />}<span>{file.name}</span><small>{formatBytes(file.size)}</small></div>)}</div>{skippedEntries.length ? <div className="import-package-issues">{skippedEntries.map((entry) => <p data-tone="warning" key={entry}><AlertTriangle size={16} />Пропущено непідтримуваний файл: {entry}</p>)}</div> : null}</> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <footer className="form-actions"><span /><button type="button" onClick={onCancel}>Скасувати</button><button className="command-button--primary" disabled={!files.length || !geoCount || loading} type="button" onClick={analyze}>{loading ? "Аналіз документів…" : `Перевірити пакет (${files.length})`}</button></footer>
   </div>;

@@ -31,6 +31,7 @@
     "better-auth": "1.6.23",
     "docx": "^9.5.1",
     "drizzle-orm": "0.45.2",
+    "fflate": "0.8.3",
     "leaflet": "1.9.4",
     "lucide-react": "1.25.0",
     "next": "16.2.11",

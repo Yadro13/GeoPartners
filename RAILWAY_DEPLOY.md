@@ -72,9 +72,9 @@ The `web` service also needs the six Bucket `AWS_*` variables to store uploaded 
 
 ## Plot document import
 
-Upload GeoJSON and PDF files together. Files with the same base name are paired first, and the cadastral numbers extracted from both sources are then compared. Coordinates come from the GeoJSON geometry; cadastral number, area, owner, and lessee come from the PDF. A mismatch blocks that pair instead of saving uncertain data.
+Upload GeoJSON and PDF files together, or select up to five ZIP archives containing the same package. ZIP contents are expanded in temporary browser memory and then enter the same review and final import path as separately selected files. Files with the same base name are paired first, and the cadastral numbers extracted from both sources are then compared. Coordinates come from the GeoJSON geometry; cadastral number, area, owner, and lessee come from the PDF. A mismatch blocks that pair instead of saving uncertain data.
 
-Each file is limited to 20 MB, each request to 60 files, and the complete package to 100 MB. Accepted formats are `.geojson`, `.json`, and `.pdf`; uploaded PDFs are also checked for a PDF file signature.
+Each extracted file is limited to 20 MB, each package to 60 files and 100 MB, and no more than five ZIP archives can be selected at once. Accepted import formats are `.geojson`, `.json`, `.pdf`, and `.zip`; uploaded PDFs and ZIP archives are checked for their real file signatures. Archive paths are validated, nested or unsupported files are not extracted, and the limits are enforced against the uncompressed package size.
 
 Valid GeoJSON coordinates are stored without automatic boundary correction. Detected overlaps are shown as informational warnings and do not block import, manual save, or version restoration. Invalid geometry, damaged files, cadastral mismatches, and duplicate cadastral numbers remain blocking errors.
 

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("playwright");
+const { zipSync } = require("fflate");
 const path = require("node:path");
 const os = require("node:os");
 
@@ -62,7 +63,19 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
   await page.getByRole("heading", { name: "Налаштування", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Імпортувати GeoJSON" }).click();
+  await page.getByRole("button", { name: "Імпортувати дані" }).click();
+  await page.locator('input[type="file"]').setInputFiles({ name: "damaged.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
+  await page.getByText("damaged.zip: вміст файлу не відповідає формату ZIP.").waitFor();
+  await page.locator('input[type="file"]').setInputFiles(zipUpload());
+  await page.getByText("1 ZIP", { exact: true }).waitFor();
+  await page.getByText("1 GeoJSON", { exact: true }).waitFor();
+  await page.getByText("1 PDF", { exact: true }).waitFor();
+  await page.getByText(/Пропущено непідтримуваний файл: package.zip: docs\/README.txt/).waitFor();
+  await page.getByRole("button", { name: "Перевірити пакет (2)", exact: true }).click();
+  await page.getByText("0 помилок").waitFor();
+  assert(!(await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).isDisabled()), "ZIP pair reaches the normal import review");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-zip-review.png") });
+  await page.getByRole("button", { name: "Змінити файли" }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/Зовнішнє кільце не замкнене/).waitFor();
@@ -80,7 +93,7 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-repaired-review.png") });
   await page.getByRole("button", { name: /Підтвердити імпорт \(1\)/ }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
-  await page.getByRole("button", { name: "Імпортувати GeoJSON" }).click();
+  await page.getByRole("button", { name: "Імпортувати дані" }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: "invalid-geometries.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(invalidGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/Самоперетинів контуру:/).waitFor();
@@ -108,7 +121,7 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-selection-review.png") });
   await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
-  await page.getByRole("button", { name: "Імпортувати GeoJSON" }).click();
+  await page.getByRole("button", { name: "Імпортувати дані" }).click();
   await page.locator('input[type="file"]').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
@@ -315,7 +328,7 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.getByRole("dialog").getByRole("button", { name: "Закрити" }).click();
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
   await page.getByRole("heading", { name: "Налаштування", exact: true }).waitFor();
-  assert((await page.getByRole("button", { name: "Імпортувати GeoJSON", exact: true }).count()) === 0, "settings hide import from a user");
+  assert((await page.getByRole("button", { name: "Імпортувати дані", exact: true }).count()) === 0, "settings hide import from a user");
   await page.getByRole("button", { name: "Експортувати GeoJSON", exact: true }).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-user-permissions.png") });
   console.log("stage=permissions");
@@ -460,6 +473,20 @@ function pdfUpload(name, cadastralNumber) {
     name,
     mimeType: "application/pdf",
     buffer: minimalPdf(cadastralNumber),
+  };
+}
+
+function zipUpload() {
+  const geo = geoJsonUpload("6820982100040510018.geojson");
+  const pdf = pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0018");
+  return {
+    name: "package.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(zipSync({
+      "docs/6820982100040510018.geojson": new Uint8Array(geo.buffer),
+      "docs/6820982100040510018.pdf": new Uint8Array(pdf.buffer),
+      "docs/README.txt": new TextEncoder().encode("service note"),
+    })),
   };
 }
 

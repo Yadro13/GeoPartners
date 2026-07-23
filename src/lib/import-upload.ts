@@ -1,8 +1,4 @@
-export const IMPORT_UPLOAD_LIMITS = {
-  files: 60,
-  fileBytes: 20 * 1024 * 1024,
-  packageBytes: 100 * 1024 * 1024,
-} as const;
+import { IMPORT_UPLOAD_LIMITS } from "@/lib/import-limits";
 
 type UploadKind = "package" | "pdf";
 
