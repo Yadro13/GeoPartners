@@ -2,7 +2,6 @@
 const { chromium } = require("playwright");
 const path = require("node:path");
 const os = require("node:os");
-const fs = require("node:fs");
 
 const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 
@@ -110,19 +109,25 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
   await page.getByRole("button", { name: "Імпортувати GeoJSON" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "1111111111:11:111:1111.geojson", mimeType: "application/geo+json", buffer: fs.readFileSync(path.resolve("plots/6820982100040510018.geojson")) });
+  await page.locator('input[type="file"]').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "overlapping import is blocked during review");
   assert((await page.locator(".map-conflict-area").count()) >= 1, "import review map highlights overlap area");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-overlap-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([{ name: "6820982100040510018.geojson", mimeType: "application/geo+json", buffer: fs.readFileSync(path.resolve("plots/6820982100040510018.geojson")) }, { name: "6820982100040510018.pdf", mimeType: "application/pdf", buffer: fs.readFileSync(path.resolve("plots/6820982100040510019.pdf")) }]);
+  await page.locator('input[type="file"]').setInputFiles([
+    geoJsonUpload("6820982100040510018.geojson"),
+    pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0019"),
+  ]);
   await page.getByRole("button", { name: /Перевірити пакет \(2\)/ }).click();
   await page.getByText(/Кадастровий номер не збігається/).waitFor();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "mismatched cadastral blocks import");
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([path.resolve("plots/6820982100040510018.geojson"), path.resolve("plots/6820982100040510018.pdf")]);
+  await page.locator('input[type="file"]').setInputFiles([
+    geoJsonUpload("6820982100040510018.geojson"),
+    pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0018"),
+  ]);
   await page.getByRole("button", { name: /Перевірити пакет \(2\)/ }).click();
   await page.getByText("0 помилок").waitFor();
   assert((await page.locator(".import-review__map .leaflet-overlay-pane path").count()) === 1, "import preview renders the contour");
@@ -133,7 +138,7 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 
   await page.getByTitle("Карта").click();
   await page.locator(".plot-row").first().click();
-  await page.getByText("Яржемська Раїса Андріївна").waitFor();
+  await page.getByText("6820982100:04:051:0018", { exact: true }).first().waitFor();
   await page.getByRole("button", { name: "Документи" }).click();
   await page.getByText("6820982100040510018.pdf").waitFor();
   await page.getByRole("dialog").getByRole("button", { name: "Закрити" }).click();
@@ -231,7 +236,7 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.getByRole("button", { name: "Скасувати", exact: true }).click();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "mobile undo restores the geometry errors");
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "1111111111:11:111:1111.geojson", mimeType: "application/geo+json", buffer: fs.readFileSync(path.resolve("plots/6820982100040510018.geojson")) });
+  await page.locator('input[type="file"]').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
   const mobileConflictReview = await page.getByRole("dialog").evaluate((element) => ({ width: element.scrollWidth, clientWidth: element.clientWidth, viewport: innerWidth }));
@@ -239,7 +244,10 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "mobile overlap review blocks import");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-import-overlap-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([path.resolve("plots/6820982100040510018.geojson"), path.resolve("plots/6820982100040510018.pdf")]);
+  await page.locator('input[type="file"]').setInputFiles([
+    geoJsonUpload("6820982100040510018.geojson"),
+    pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0018"),
+  ]);
   await page.getByRole("button", { name: /Перевірити пакет \(2\)/ }).click();
   await page.getByText("0 помилок").waitFor();
   const mobileImport = await page.getByRole("dialog").evaluate((element) => ({ width: element.scrollWidth, clientWidth: element.clientWidth, viewport: innerWidth }));
@@ -420,4 +428,61 @@ function selectiveGeometryPackage() {
     { type: "Feature", properties: { id: "selective-invalid", cadastralNumber: "1111111111:11:111:1101" }, geometry: { type: "Polygon", coordinates: [[[26.64, 49.45], [26.641, 49.451], [26.64, 49.451], [26.641, 49.45], [26.64, 49.45]]] } },
     { type: "Feature", properties: { id: "selective-update", cadastralNumber: "6820982100:04:051:0018" }, geometry: { type: "Polygon", coordinates: [[[26.65297, 49.44633], [26.65294, 49.44369], [26.6529, 49.44171], [26.65147, 49.44226], [26.65157, 49.44588], [26.65297, 49.44633]]] } },
   ] };
+}
+
+function geoJsonUpload(name) {
+  return {
+    name,
+    mimeType: "application/geo+json",
+    buffer: Buffer.from(JSON.stringify({
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [26.6529714205102, 49.446334845838],
+            [26.6529425532864, 49.4436905486125],
+            [26.6529020932764, 49.4417105416452],
+            [26.6514738752057, 49.4422607980263],
+            [26.6515718428895, 49.445879930341],
+            [26.6529714205102, 49.446334845838],
+          ],
+        },
+        properties: { type: "LineString", coordSys: "SC63" },
+      }],
+    })),
+  };
+}
+
+function pdfUpload(name, cadastralNumber) {
+  return {
+    name,
+    mimeType: "application/pdf",
+    buffer: minimalPdf(cadastralNumber),
+  };
+}
+
+function minimalPdf(text) {
+  const escaped = text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  const stream = `BT /F1 12 Tf 72 720 Td (${escaped}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+  ];
+  let content = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(content));
+    content += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = Buffer.byteLength(content);
+  content += `xref\n0 ${objects.length + 1}\n`;
+  content += "0000000000 65535 f \n";
+  for (const offset of offsets.slice(1)) content += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  content += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(content);
 }
