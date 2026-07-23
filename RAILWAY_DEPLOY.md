@@ -28,6 +28,7 @@ The staging web, notification, and backup services are linked to `Yadro13/GeoPar
 - Source: `Yadro13/GeoPartners`, branch `main`.
 - Services: `geopartners-web`, `geopartners-notifications`, `geopartners-backup`, PostgreSQL, Mailpit, and an isolated Bucket instance.
 - Automatic deploys: enabled for web, notifications, and backup; each service uses its dedicated Railway config file.
+- GitHub App repository access and the `main` branch triggers were verified on 2026-07-23.
 
 Production was created from the staging configuration on 2026-07-23. PostgreSQL data and Bucket objects remain isolated between environments. The Railway production domain is active and is configured as `APP_URL` and `BETTER_AUTH_URL`.
 
