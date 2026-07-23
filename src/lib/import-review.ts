@@ -133,7 +133,7 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
       const pairKey = [candidate.plot.properties.id, conflict.plotId].sort().join(":");
       const source = includedIds.has(conflict.plotId) ? "між файлами пакета" : "з ділянкою у поточній базі";
       const label = conflict.scale === "micro" ? "Мікронакладання" : "Накладання";
-      next.issues.push({ level: "error", dedupeKey: `overlap:${pairKey}`, message: `${label} ${formatSquareMeters(conflict.overlapAreaSquareMeters)} з ${conflict.cadastralNumber} · ${source}.` });
+      next.issues.push({ level: "warning", dedupeKey: `overlap:${pairKey}`, message: `${label} ${formatSquareMeters(conflict.overlapAreaSquareMeters)} з ${conflict.cadastralNumber} · ${source}. Координати буде збережено без змін.` });
     }
     return next;
   });

@@ -24,7 +24,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const blockingMessages = [
       ...validation.issues.filter(({ level }) => level === "error").map(({ message }) => message),
       ...(duplicate ? ["Кадастровий номер уже використовується іншою ділянкою."] : []),
-      ...conflicts.map(({ cadastralNumber }) => `Накладання з ділянкою ${cadastralNumber}.`),
     ];
     return NextResponse.json({ auditId: id, action: record.entry.action, current, target, validationIssues: validation.issues, conflicts, blockingMessages }, { headers: { "cache-control": "no-store" } });
   } catch (error) {

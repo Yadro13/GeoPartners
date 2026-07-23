@@ -5,7 +5,6 @@ import { auditLog, category, plot, plotVersion } from "@/db/schema";
 import { defaultCategories } from "@/data/demo";
 import { getCurrentUser } from "@/lib/access";
 import { auditValues, changedPlotFields, parseVersionSnapshot, versionSnapshot } from "@/lib/audit";
-import { findPlotConflicts } from "@/lib/geometry";
 import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/plots";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
@@ -26,9 +25,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const rows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const current = rows.find((row) => row.id === feature.properties.id);
     const duplicate = rows.find((row) => row.id !== feature.properties.id && row.cadastralNumber === feature.properties.cadastralNumber);
     if (duplicate) return NextResponse.json({ error: "Відновлення створить дубль кадастрового номера." }, { status: 409 });
-    const neighbors = rows.filter((row) => row.id !== feature.properties.id).map(plotRowToFeature); const conflicts = findPlotConflicts(feature.geometry, neighbors);
-    if (conflicts.length) return NextResponse.json({ error: `Відновлений контур накладатиметься на ${conflicts.map(({ cadastralNumber }) => cadastralNumber).join(", ")}.`, conflicts }, { status: 409 });
-
     const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
     const currentFeature = current ? plotRowToFeature(current) : null; const changes = changedPlotFields(currentFeature, feature); const restoreAuditId = crypto.randomUUID();
     await db.transaction(async (tx) => {

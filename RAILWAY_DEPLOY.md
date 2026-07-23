@@ -39,7 +39,7 @@ Production was created from the staging configuration on 2026-07-23. PostgreSQL 
 - The Git branch `main` is the source for automatic production deployments and remains frozen between approved releases.
 - Tested code is promoted from `staging` to `main` only after the relevant staging acceptance checks pass.
 - Production PostgreSQL and Bucket data are not synchronized continuously.
-- The final staging-to-production data transfer will run only after the customer resolves the open overlap, report, and domain questions and the resulting changes pass staging acceptance.
+- The final staging-to-production data transfer will run only after the customer resolves the open report and domain questions and the resulting changes pass staging acceptance.
 - The transfer must include PostgreSQL records and referenced Bucket objects, followed by production authentication, notification, document, report, and backup checks.
 
 The active staging SMTP relay is Brevo in both the web and notification services. Mailpit remains as a private staging-only service until the password-reset flow has also been exercised against Brevo; it is no longer referenced by the active application SMTP variables. Google OAuth and the private Telegram administrator channel are configured for staging.
@@ -74,11 +74,13 @@ The `web` service also needs the six Bucket `AWS_*` variables to store uploaded 
 
 Upload GeoJSON and PDF files together. Files with the same base name are paired first, and the cadastral numbers extracted from both sources are then compared. Coordinates come from the GeoJSON geometry; cadastral number, area, owner, and lessee come from the PDF. A mismatch blocks that pair instead of saving uncertain data.
 
-Each file is limited to 20 MB and each request to 60 files. Accepted formats are `.geojson`, `.json`, and `.pdf`.
+Each file is limited to 20 MB, each request to 60 files, and the complete package to 100 MB. Accepted formats are `.geojson`, `.json`, and `.pdf`; uploaded PDFs are also checked for a PDF file signature.
+
+Valid GeoJSON coordinates are stored without automatic boundary correction. Detected overlaps are shown as informational warnings and do not block import, manual save, or version restoration. Invalid geometry, damaged files, cadastral mismatches, and duplicate cadastral numbers remain blocking errors.
 
 ## Plot version history
 
-Updates, imports, and deletions store the previous plot state in PostgreSQL. Administrators can restore an available version from the audit log; cadastral duplicates, invalid geometry, and overlaps are checked again before restoration.
+Updates, imports, and deletions store the previous plot state in PostgreSQL. Administrators can restore an available version from the audit log; cadastral duplicates and invalid geometry are checked again before restoration, while overlaps are shown as non-blocking information.
 
 PDF objects referenced by older plot versions are retained in the Railway Bucket so that restoring a version can also restore its document. Do not add a short bucket lifecycle rule for the `plots/` prefix. Database backups continue to use their separate 90-day retention policy.
 

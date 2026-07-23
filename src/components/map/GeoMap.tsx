@@ -48,7 +48,7 @@ export function GeoMap({ selectedId, onSelect, compact = false, plots, categorie
     const properties = feature?.properties as PlotProperties | undefined;
     const conflicting = Boolean(properties && conflictSet.has(properties.id));
     const comparisonCurrent = properties?.category === "version-current";
-    const color = conflicting ? "#b12626" : properties ? (categories[properties.category]?.color ?? categories.default?.color ?? "#2f86a6") : "#2f86a6";
+    const color = conflicting ? "#9a650c" : properties ? (categories[properties.category]?.color ?? categories.default?.color ?? "#2f86a6") : "#2f86a6";
     const selected = properties?.id === selectedId;
     return {
       color,
@@ -77,7 +77,7 @@ export function GeoMap({ selectedId, onSelect, compact = false, plots, categorie
           layer.bindTooltip(feature.properties.cadastralNumber, { sticky: true, direction: "top" });
         }}
       />
-      {overlapFeatures.length ? <GeoJSON key={`overlaps-${overlapFeatures.length}-${dataKey}`} data={{ type: "FeatureCollection", features: overlapFeatures } as FeatureCollection<Polygon | MultiPolygon>} interactive={false} style={{ className: "map-conflict-area", color: "#8f1f1f", dashArray: "3 3", fillColor: "#ef4e4e", fillOpacity: 0.5, weight: 2 }} /> : null}
+      {overlapFeatures.length ? <GeoJSON key={`overlaps-${overlapFeatures.length}-${dataKey}`} data={{ type: "FeatureCollection", features: overlapFeatures } as FeatureCollection<Polygon | MultiPolygon>} interactive={false} style={{ className: "map-conflict-area", color: "#8a5b08", dashArray: "3 3", fillColor: "#f2b642", fillOpacity: 0.46, weight: 2 }} /> : null}
       {validationMarkers.map((marker, index) => <CircleMarker key={`${marker.level}-${marker.coordinates.join("-")}-${index}`} center={[marker.coordinates[1], marker.coordinates[0]]} radius={marker.level === "error" ? 7 : 5} pathOptions={{ className: `map-validation-marker map-validation-marker--${marker.level}`, color: marker.level === "error" ? "#8f1f1f" : "#8a5b08", fillColor: marker.level === "error" ? "#ef4e4e" : "#f2b642", fillOpacity: 0.88, weight: 2 }}><Tooltip direction="top">{marker.message}</Tooltip></CircleMarker>)}
       <FitPlots plots={visiblePlots} />
     </MapContainer>

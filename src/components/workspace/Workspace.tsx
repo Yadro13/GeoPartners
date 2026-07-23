@@ -6,7 +6,7 @@ import { Download, FileText, ShieldCheck } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { demoPlots, type CategoryDefinition } from "@/data/demo";
 import { categoriesWithDefaults, downloadText, normalizeImport, plotsToCsv, toFeatureCollection, type ImportResult } from "@/lib/plot-data";
-import { findPlotConflicts, validatePolygonGeometry } from "@/lib/geometry";
+import { validatePolygonGeometry } from "@/lib/geometry";
 import { hasPermission } from "@/lib/permissions";
 import type { DataWorkspace } from "@/lib/data-workspace";
 import { DesktopWorkspace } from "./desktop/DesktopWorkspace";
@@ -89,9 +89,6 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
     for (const item of prepared) {
       const geometryErrors = validatePolygonGeometry(item.geometry).issues.filter(({ level }) => level === "error");
       if (geometryErrors.length) throw new Error(`${item.properties.cadastralNumber}: ${geometryErrors.map(({ message }) => message).join(" ")}`);
-      const neighbors = [...finalPlots.values()].filter(({ properties }) => properties.id !== item.properties.id);
-      const conflicts = findPlotConflicts(item.geometry, neighbors);
-      if (conflicts.length) throw new Error(`${item.properties.cadastralNumber}: контур накладається на ${conflicts.map(({ cadastralNumber }) => cadastralNumber).join(", ")}.`);
     }
     await persistCategories(mergedCategories);
     let added = 0; let updated = 0;

@@ -564,6 +564,12 @@
   color: #9d3030;
 }
 
+.version-compare__status[data-tone="warning"] {
+  background: #fff8e8;
+  border-color: #ddb96b;
+  color: #825a0c;
+}
+
 .version-compare__status svg {
   flex: 0 0 auto;
 }
@@ -1094,9 +1100,9 @@
 
 .geometry-conflicts {
   align-items: flex-start;
-  background: #fff0f0;
-  border: 1px solid #e1a7a7;
-  color: #8d2929;
+  background: #fff8e8;
+  border: 1px solid #ddb96b;
+  color: #825a0c;
   display: flex;
   gap: 9px;
   margin-top: 8px;
@@ -1311,9 +1317,9 @@
 
 .import-conflict-guide {
   align-items: start;
-  background: #fff4f2;
-  border: 1px solid #d9a19a;
-  color: #8d2f2a;
+  background: #fff8e8;
+  border: 1px solid #ddb96b;
+  color: #825a0c;
   display: grid;
   gap: 10px;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1343,7 +1349,7 @@
 }
 
 .import-conflict-guide small {
-  color: #6f5753;
+  color: #6c5b35;
 }
 
 .import-conflict-guide__actions {
@@ -1629,6 +1635,11 @@
 
 .import-review__details dd[data-tone="error"] {
   color: #a43737;
+  font-weight: 800;
+}
+
+.import-review__details dd[data-tone="warning"] {
+  color: #825a0c;
   font-weight: 800;
 }
 

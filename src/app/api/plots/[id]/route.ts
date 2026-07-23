@@ -5,7 +5,6 @@ import { auditLog, category, plot, plotVersion } from "@/db/schema";
 import { defaultCategories } from "@/data/demo";
 import { getCurrentUser } from "@/lib/access";
 import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/plots";
-import { findPlotConflicts } from "@/lib/geometry";
 import { auditValues, changedPlotFields, versionSnapshot } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
@@ -23,8 +22,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const neighboringRows = allRows.filter((row) => row.id !== id);
     const duplicate = neighboringRows.find((row) => row.cadastralNumber === feature.properties.cadastralNumber);
     if (duplicate) return NextResponse.json({ error: "Ділянка з таким кадастровим номером уже існує." }, { status: 409 });
-    const conflicts = findPlotConflicts(feature.geometry, neighboringRows.map(plotRowToFeature));
-    if (conflicts.length) return NextResponse.json({ error: `Контур накладається на ${conflicts.length} сусідні ділянки.`, conflicts }, { status: 409 });
     const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
     const before = plotRowToFeature(current); const changes = changedPlotFields(before, feature);
     const auditId = crypto.randomUUID();

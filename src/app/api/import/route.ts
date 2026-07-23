@@ -13,6 +13,7 @@ import { findPlotConflicts, validatePolygonGeometry } from "@/lib/geometry";
 import { auditValues, changedPlotFields, versionSnapshot } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
+import { readPdfBuffer, validateUploadFiles } from "@/lib/import-upload";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const uploadedKeys: string[] = [];
   try {
     const form = await request.formData(); const files = form.getAll("files").filter((value): value is File => value instanceof File);
-    validateFiles(files);
+    validateUploadFiles(files);
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
     const [pdfs, existingRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace))]);
@@ -65,10 +66,16 @@ export async function POST(request: Request) {
     }
     const finalPlots = new Map(existingRows.map((row) => [row.id, plotRowToFeature(row)]));
     for (const item of prepared) finalPlots.set(item.feature.properties.id, item.feature);
+    const overlapPairs = new Set<string>();
     for (const item of prepared) {
       const neighbors = [...finalPlots.values()].filter(({ properties }) => properties.id !== item.feature.properties.id);
       const conflicts = findPlotConflicts(item.feature.geometry, neighbors);
-      if (conflicts.length) throw new Error(`${item.feature.properties.cadastralNumber}: контур накладається на ${conflicts.map(({ cadastralNumber }) => cadastralNumber).join(", ")}.`);
+      for (const conflict of conflicts) {
+        const pairKey = [item.feature.properties.id, conflict.plotId].sort().join(":");
+        if (overlapPairs.has(pairKey)) continue;
+        overlapPairs.add(pairKey);
+        warnings.push(`${item.feature.properties.cadastralNumber}: накладання з ${conflict.cadastralNumber}; координати GeoJSON збережено без змін.`);
+      }
     }
 
     const batchId = crypto.randomUUID();
@@ -102,8 +109,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function parsePdfFile(file: File): Promise<ParsedPdf> { const buffer = Buffer.from(await file.arrayBuffer()); return { file, buffer, stem: fileStem(file.name), metadata: await parseLandDocument(buffer) }; }
-function validateFiles(files: File[]) { if (!files.length) throw new Error("Файли не вибрано."); if (files.length > 60) throw new Error("За один раз можна завантажити не більше 60 файлів."); for (const file of files) { if (!/\.(pdf|json|geojson)$/i.test(file.name)) throw new Error(`${file.name}: непідтримуваний формат.`); if (file.size > 20 * 1024 * 1024) throw new Error(`${file.name}: розмір перевищує 20 МБ.`); } }
+async function parsePdfFile(file: File): Promise<ParsedPdf> { const buffer = await readPdfBuffer(file); return { file, buffer, stem: fileStem(file.name), metadata: await parseLandDocument(buffer) }; }
 function fileStem(name: string) { return name.replace(/\.(pdf|geojson|json)$/i, "").toLocaleLowerCase(); }
 function cadastralDigits(value: string) { return value.replace(/\D/g, ""); }
 function safeFilename(name: string) { return name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-160); }
