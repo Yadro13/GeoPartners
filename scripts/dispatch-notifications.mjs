@@ -1,18 +1,30 @@
 import nodemailer from "nodemailer";
 import pg from "pg";
+import { structuredError, structuredLog } from "./structured-log.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
-const mailer = process.env.SMTP_HOST ? nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT ?? 587),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
-}) : null;
+const service = "geopartners-notifications";
+let pool = null;
 
 try {
-  const { rows } = await pool.query(`
+  if (!process.env.DATABASE_URL) throw Object.assign(new Error("Missing required configuration"), { code: "CONFIG_MISSING" });
+  pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+  const mailer = process.env.SMTP_HOST ? nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+  }) : null;
+  await dispatch(pool, mailer);
+} catch (error) {
+  structuredLog(service, "error", "notifications.worker.failed", structuredError(error));
+  process.exitCode = 1;
+} finally {
+  await pool?.end();
+}
+
+async function dispatch(database, mailer) {
+  const startedAt = Date.now();
+  const { rows } = await database.query(`
     select id, channel, recipient, template, payload, attempts
     from notification_outbox
     where status in ('pending', 'failed')
@@ -21,25 +33,59 @@ try {
     order by created_at
     limit 50
   `);
+  structuredLog(service, "info", "notifications.dispatch.started", { selected: rows.length });
 
+  let sent = 0;
+  let failed = 0;
   for (const notification of rows) {
     try {
-      await deliver(notification);
-      await pool.query("update notification_outbox set status = 'sent', sent_at = now(), last_error = null where id = $1", [notification.id]);
+      await deliver(notification, mailer);
+      await database.query("update notification_outbox set status = 'sent', sent_at = now(), last_error = null where id = $1", [notification.id]);
+      sent += 1;
+      structuredLog(service, "info", "notifications.delivery.sent", {
+        channel: notification.channel,
+        template: notification.template,
+        attempt: Number(notification.attempts) + 1,
+      });
     } catch (error) {
-      await pool.query(`update notification_outbox set status = 'failed', attempts = (attempts::integer + 1)::numeric, last_error = $2, next_attempt_at = now() + interval '15 minutes' where id = $1`, [notification.id, error instanceof Error ? error.message : String(error)]);
+      failed += 1;
+      await database.query(`update notification_outbox set status = 'failed', attempts = (attempts::integer + 1)::numeric, last_error = $2, next_attempt_at = now() + interval '15 minutes' where id = $1`, [notification.id, error instanceof Error ? error.message : String(error)]);
+      structuredLog(service, "warn", "notifications.delivery.failed", {
+        channel: notification.channel,
+        template: notification.template,
+        attempt: Number(notification.attempts) + 1,
+        ...structuredError(error),
+      });
     }
   }
 
-  console.info(`Notification dispatch completed: ${rows.length} item(s)`);
-} finally {
-  await pool.end();
+  const { rows: [queue] } = await database.query(`
+    select
+      count(*) filter (where status = 'pending')::int as pending,
+      count(*) filter (where status = 'failed' and attempts::integer < 6)::int as failed,
+      count(*) filter (where status = 'failed' and attempts::integer >= 6)::int as exhausted,
+      min(created_at) filter (where status <> 'sent') as oldest_unsent_at
+    from notification_outbox
+  `);
+  const oldestAgeMinutes = queue.oldest_unsent_at
+    ? Math.max(0, Math.round((Date.now() - new Date(queue.oldest_unsent_at).getTime()) / 60000))
+    : 0;
+  structuredLog(service, failed || queue.exhausted ? "warn" : "info", "notifications.dispatch.completed", {
+    selected: rows.length,
+    sent,
+    failed,
+    pending: queue.pending,
+    retriable: queue.failed,
+    exhausted: queue.exhausted,
+    oldestAgeMinutes,
+    durationMs: Date.now() - startedAt,
+  });
 }
 
-async function deliver(notification) {
+async function deliver(notification, mailer) {
   if (notification.channel === "telegram") {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+    if (!token) throw Object.assign(new Error("Telegram is not configured"), { code: "TELEGRAM_CONFIG_MISSING" });
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -50,11 +96,11 @@ async function deliver(notification) {
         ...(notification.payload.reviewUrl ? { reply_markup: { inline_keyboard: [[{ text: "Переглянути заявку", url: notification.payload.reviewUrl }]] } } : {}),
       }),
     });
-    if (!response.ok) throw new Error(`Telegram returned ${response.status}`);
+    if (!response.ok) throw Object.assign(new Error("Telegram delivery failed"), { code: `HTTP_${response.status}` });
     return;
   }
 
-  if (!mailer) throw new Error("SMTP is not configured");
+  if (!mailer) throw Object.assign(new Error("SMTP is not configured"), { code: "SMTP_CONFIG_MISSING" });
   const message = buildEmail(notification);
   await mailer.sendMail({ from: process.env.SMTP_FROM, to: notification.recipient, ...message });
 }

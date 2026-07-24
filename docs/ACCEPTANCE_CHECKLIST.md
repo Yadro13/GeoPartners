@@ -53,7 +53,10 @@
 - [x] Перевірка цілісності архіву перед завантаженням.
 - [x] Безпечний скрипт відновлення в окрему БД.
 - [x] Health-check із перевіркою PostgreSQL.
+- [x] Health-check і кабінет адміністратора показують стан notification outbox без адресатів та вмісту повідомлень.
+- [x] Структуровані JSON-журнали для auth, імпорту, notification worker і backup без персональних даних та секретів.
 - [x] CI: lint, TypeScript, production build, desktop/mobile smoke test.
+- [x] CI перевіряє видалення чутливих полів із журналів і повноту критичних таблиць backup.
 - [x] Повний restore drill виконано у тимчасову Railway БД 23 липня 2026 року; архів відновлено, таблиці перевірено, тимчасову БД видалено.
 - [ ] Підключити остаточний домен, DNS, TLS і production OAuth callback після рішення замовника.
 
@@ -64,6 +67,7 @@
 - [x] Інструкція адміністратора.
 - [x] Railway deployment runbook.
 - [x] Backup/restore runbook.
+- [x] Dry-run runbook перенесення PostgreSQL і Bucket зі staging у production без виконання переносу.
 - [x] Реєстр відкритих питань до замовника.
 - [x] Зафіксовано staging-backlog і порядок перенесення перевіреного стану в production.
 - [ ] Фінальна приймальна перевірка на production-домені.

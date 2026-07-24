@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Download, FileText, ShieldCheck } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { demoPlots, type CategoryDefinition } from "@/data/demo";
 import { categoriesWithDefaults, downloadText, normalizeImport, plotsToCsv, toFeatureCollection, type ImportResult } from "@/lib/plot-data";
@@ -15,6 +14,7 @@ import { ImportForm } from "./ImportForm";
 import { PlotForm } from "./PlotForm";
 import { WorkspaceModal } from "./WorkspaceModal";
 import { PlotDetails } from "./PlotDetails";
+import { NotificationPanel } from "./NotificationPanel";
 import type { BaseMapId, PlotFeature, WorkspaceActions, WorkspaceSection, WorkspaceUser } from "./types";
 import "./workspace.css";
 
@@ -216,7 +216,7 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
     {modal?.type === "import" ? <WorkspaceModal title="Імпорт ділянок і документів" description="Виберіть GeoJSON/PDF або ZIP з таким пакетом. Архів буде розпаковано перед перевіркою." onClose={() => setModal(null)} wide><ImportForm onImport={importFiles} onCancel={() => setModal(null)} existingPlots={plots} categories={categories} baseMap={baseMap} /></WorkspaceModal> : null}
     {modal?.type === "documents" ? <WorkspaceModal title="Документи ділянки" description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)}><div className="document-list"><button type="button" onClick={() => downloadText(JSON.stringify(modal.plot, null, 2), `${modal.plot.properties.cadastralNumber.replaceAll(":", "")}.geojson`, "application/geo+json")}><FileText size={20} /><span><strong>Геометрія ділянки</strong><small>GeoJSON</small></span><Download size={18} /></button>{modal.plot.properties.documentUrl ? <a href={modal.plot.properties.documentUrl} target="_blank" rel="noreferrer"><FileText size={20} /><span><strong>{modal.plot.properties.documentName ?? "Документ ділянки"}</strong><small>PDF</small></span><Download size={18} /></a> : <p>PDF для цієї ділянки ще не прикріплено.</p>}</div></WorkspaceModal> : null}
     {modal?.type === "card" ? <WorkspaceModal title="Картка ділянки" onClose={() => setModal(null)}><PlotDetails plot={modal.plot} categories={categories} onEdit={(plot) => setModal({ type: "edit", plot })} onDocuments={(plot) => setModal({ type: "documents", plot })} onOpenCard={() => undefined} /></WorkspaceModal> : null}
-    {modal?.type === "notifications" ? <WorkspaceModal title="Сповіщення" onClose={() => setModal(null)}><div className="notification-panel"><ShieldCheck size={24} /><h3>Центр сповіщень</h3><p>{currentUser.role === "admin" ? "Нові заявки на реєстрацію відображаються в кабінеті адміністратора." : "Нових сповіщень немає."}</p>{currentUser.role === "admin" ? <Link className="command-button command-button--primary" href="/admin/registrations">Переглянути заявки</Link> : null}</div></WorkspaceModal> : null}
+    {modal?.type === "notifications" ? <WorkspaceModal title="Сповіщення" onClose={() => setModal(null)}><NotificationPanel isAdmin={currentUser.role === "admin"} preview={preview} /></WorkspaceModal> : null}
     {toast ? <div className="workspace-toast" role="status">{toast}</div> : null}
   </>;
 }

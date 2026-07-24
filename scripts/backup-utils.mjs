@@ -6,8 +6,12 @@ import { spawn } from "node:child_process";
 
 export const coreTables = [
   "user",
+  "session",
   "account",
+  "verification",
   "registration_request",
+  "notification_outbox",
+  "app_settings",
   "category",
   "plot",
   "audit_log",

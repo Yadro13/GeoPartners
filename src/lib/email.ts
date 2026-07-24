@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { serverLog } from "./server-log";
 
 export type EmailMessage = {
   to: string;
@@ -29,7 +30,7 @@ export async function sendEmail(message: EmailMessage) {
   const mailer = getTransporter();
   if (!mailer) {
     if (process.env.NODE_ENV !== "production") {
-      console.info(`[email:preview] ${message.subject} -> ${message.to}\n${message.text}`);
+      serverLog("info", "email.preview.skipped", { transportConfigured: false });
       return;
     }
     throw new Error("SMTP is not configured");

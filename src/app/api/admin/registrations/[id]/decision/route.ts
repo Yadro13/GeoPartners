@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { notificationOutbox, registrationRequest, user } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
+import { errorFields, serverLog } from "@/lib/server-log";
 
 const bodySchema = z.object({
   decision: z.enum(["approved", "rejected"]),
@@ -50,7 +51,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       subject: approved ? "Доступ до GeoPartners підтверджено" : "Результат реєстрації у GeoPartners",
       text: `${approved ? `Вашу реєстрацію підтверджено. Увійти: ${appUrl}/sign-in` : "Вашу заявку на доступ відхилено."}${commentText}`,
     });
+    serverLog("info", "registration.decision_notification.sent", { decision: parsed.data.decision });
   } catch (error) {
+    serverLog("warn", "registration.decision_notification.queued", { decision: parsed.data.decision, ...errorFields(error) });
     await db.insert(notificationOutbox).values({
       channel: "email",
       recipient: applicant.email,
@@ -62,5 +65,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   }
 
+  serverLog("info", "registration.decision.completed", { decision: parsed.data.decision, commentProvided: Boolean(parsed.data.comment) });
   return NextResponse.json({ ok: true });
 }

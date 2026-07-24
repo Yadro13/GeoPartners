@@ -1,20 +1,26 @@
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
+import { getNotificationQueueSummary } from "@/lib/notification-monitor";
+import { errorFields, serverLog } from "@/lib/server-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    await Promise.race([
-      db.execute(sql`select 1`),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Database health check timed out.")), 3000)),
+    const [, notifications] = await Promise.all([
+      Promise.race([
+        db.execute(sql`select 1`),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Database health check timed out.")), 3000)),
+      ]),
+      getNotificationQueueSummary(),
     ]);
     return NextResponse.json({
-      status: "ok",
+      status: notifications.state === "attention" ? "degraded" : "ok",
       service: "geopartners",
       database: "ok",
+      notifications: notifications.state,
       storageConfigured: Boolean(
         process.env.AWS_ENDPOINT_URL
         && process.env.AWS_ACCESS_KEY_ID
@@ -23,7 +29,7 @@ export async function GET() {
       ),
     });
   } catch (error) {
-    console.error("Health check failed.", error);
+    serverLog("error", "health.failed", errorFields(error));
     return NextResponse.json({
       status: "degraded",
       service: "geopartners",

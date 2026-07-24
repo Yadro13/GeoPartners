@@ -14,6 +14,7 @@ import { auditValues, changedPlotFields, versionSnapshot } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
 import { readPdfBuffer, validateUploadFiles } from "@/lib/import-upload";
+import { errorFields, serverLog } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -25,12 +26,14 @@ export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "imports.run")) return NextResponse.json({ error: "Імпорт доступний лише адміністратору." }, { status: 403 });
+  const startedAt = Date.now();
   const workspace = await getDataWorkspace();
   const uploadedKeys: string[] = [];
   try {
     const form = await request.formData(); const files = form.getAll("files").filter((value): value is File => value instanceof File);
     validateUploadFiles(files);
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
+    serverLog("info", "import.started", { workspace, fileCount: files.length, geoJsonCount: geoFiles.length, pdfCount: pdfFiles.length });
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
     const [pdfs, existingRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace))]);
     const existingByCadastral = new Map(existingRows.map((row) => [cadastralDigits(row.cadastralNumber), row]));
@@ -103,8 +106,10 @@ export async function POST(request: Request) {
     }
 
     const savedRows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const savedById = new Map(savedRows.map((row) => [row.id, row]));
+    serverLog("info", "import.completed", { workspace, added: addedCount, updated: updatedCount, warningCount: warnings.length, durationMs: Date.now() - startedAt });
     return NextResponse.json({ plots: prepared.map((item) => plotRowToFeature(savedById.get(item.feature.properties.id)!)), categories: importedCategories, warnings });
   } catch (error) {
+    serverLog("error", "import.failed", { workspace, uploadedCount: uploadedKeys.length, durationMs: Date.now() - startedAt, ...errorFields(error) });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Не вдалося імпортувати пакет." }, { status: 400 });
   }
 }

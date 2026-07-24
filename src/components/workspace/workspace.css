@@ -1751,18 +1751,79 @@
   align-items: center;
   display: flex;
   flex-direction: column;
+  gap: 10px;
   padding: 18px;
   text-align: center;
 }
 
 .notification-panel h3 {
-  margin: 10px 0 3px;
+  margin: 0;
 }
 
 .notification-panel p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+  margin: 0;
+}
+
+.notification-panel__icon {
+  color: var(--green);
+}
+
+.notification-panel__icon[data-tone="warning"] {
+  color: var(--amber);
+}
+
+.notification-panel__error {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notification-status {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 4px 0;
+  width: 100%;
+}
+
+.notification-status > div {
+  padding: 12px 8px;
+}
+
+.notification-status > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.notification-status dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.notification-status dd {
+  font-size: 21px;
+  font-weight: 850;
+  margin: 4px 0 0;
+}
+
+.notification-status [data-tone="warning"] dd {
+  color: #a43737;
+}
+
+.notification-status__age {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 10px;
+  gap: 5px;
+}
+
+.notification-status__refresh {
+  margin-bottom: 4px;
 }
 
 .workspace-toast {

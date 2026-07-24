@@ -6,6 +6,7 @@ import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendEmail } from "./email";
 import { createRegistrationRequest } from "./registration";
+import { errorFields, serverLog } from "./server-log";
 
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -31,7 +32,7 @@ export const auth = betterAuth({
         subject: "Відновлення пароля GeoPartners",
         text: `Щоб встановити новий пароль, відкрийте посилання: ${url}`,
         html: `<p>Щоб встановити новий пароль GeoPartners, відкрийте посилання:</p><p><a href="${url}">Встановити новий пароль</a></p>`,
-      }).catch((error) => console.error("Password reset email delivery failed.", error));
+      }).catch((error) => serverLog("error", "auth.password_reset.delivery_failed", errorFields(error)));
     },
   },
   emailVerification: {
@@ -40,12 +41,18 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
-      await sendEmail({
-        to: user.email,
-        subject: "Підтвердження email у GeoPartners",
-        text: `Підтвердіть адресу email за посиланням: ${url}`,
-        html: `<p>Підтвердіть адресу email для реєстрації у GeoPartners.</p><p><a href="${url}">Підтвердити email</a></p><p>Посилання дійсне протягом однієї години.</p>`,
-      });
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "Підтвердження email у GeoPartners",
+          text: `Підтвердіть адресу email за посиланням: ${url}`,
+          html: `<p>Підтвердіть адресу email для реєстрації у GeoPartners.</p><p><a href="${url}">Підтвердити email</a></p><p>Посилання дійсне протягом однієї години.</p>`,
+        });
+        serverLog("info", "auth.email_verification.sent");
+      } catch (error) {
+        serverLog("error", "auth.email_verification.delivery_failed", errorFields(error));
+        throw error;
+      }
     },
     afterEmailVerification: async (verifiedUser) => {
       await createRegistrationRequest(verifiedUser.id, "password");
@@ -58,6 +65,7 @@ export const auth = betterAuth({
           clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
           mapProfileToUser: (profile) => {
             if (adminEmail && profile.email?.trim().toLowerCase() === adminEmail) {
+              serverLog("warn", "auth.google.admin_blocked");
               throw new APIError("FORBIDDEN", {
                 message: "Адміністратор входить лише за допомогою email і пароля.",
               });
@@ -97,6 +105,10 @@ export const auth = betterAuth({
           };
         },
         after: async (createdUser) => {
+          serverLog("info", "auth.user.created", {
+            role: createdUser.email.toLowerCase() === adminEmail ? "admin" : "user",
+            verifiedAtCreation: createdUser.emailVerified,
+          });
           if (createdUser.emailVerified && createdUser.email.toLowerCase() !== adminEmail) {
             await createRegistrationRequest(createdUser.id, "google");
           }

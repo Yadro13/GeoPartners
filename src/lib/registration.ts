@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { notificationOutbox, registrationRequest, user } from "@/db/schema";
 import { sendEmail } from "./email";
 import { sendTelegramMessage } from "./telegram";
+import { errorFields, serverLog } from "./server-log";
 
 type RegistrationMethod = "password" | "google";
 
@@ -19,6 +20,7 @@ export async function createRegistrationRequest(userId: string, method: Registra
   if (!request) return;
 
   await db.update(user).set({ approvalStatus: "pending", registrationMethod: method }).where(eq(user.id, userId));
+  serverLog("info", "registration.request.created", { method });
   await notifyAdminAboutRegistration({
     requestId: request.id,
     name: applicant.name,
@@ -48,9 +50,12 @@ async function notifyAdminAboutRegistration(input: { requestId: string; name: st
   }
 
   const results = await Promise.allSettled(tasks.map((task) => task.promise));
+  let queued = 0;
   for (const [index, result] of results.entries()) {
     if (result.status !== "rejected") continue;
     const task = tasks[index];
+    queued += 1;
+    serverLog("warn", "registration.admin_notification.queued", { channel: task.channel, ...errorFields(result.reason) });
     await db.insert(notificationOutbox).values({
       channel: task.channel,
       recipient: task.recipient,
@@ -61,6 +66,7 @@ async function notifyAdminAboutRegistration(input: { requestId: string; name: st
       lastError: result.reason instanceof Error ? result.reason.message : String(result.reason),
     });
   }
+  serverLog("info", "registration.admin_notification.completed", { selected: tasks.length, sent: tasks.length - queued, queued });
 }
 
 export async function getPendingRegistration(requestId: string) {
