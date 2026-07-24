@@ -38,6 +38,7 @@ npm run test:e2e
 - [Розгортання на Railway](RAILWAY_DEPLOY.md)
 - [Резервні копії та відновлення](docs/BACKUP_RESTORE.md)
 - [Dry-run перенесення staging у production](docs/STAGING_TO_PRODUCTION.md)
+- [Production у Railway-акаунті замовника](docs/CUSTOMER_RAILWAY_PRODUCTION_PLAN.md)
 - [Інструкція користувача](docs/USER_GUIDE.md)
 - [Інструкція адміністратора](docs/ADMIN_GUIDE.md)
 - [Приймальний чек-лист](docs/ACCEPTANCE_CHECKLIST.md)

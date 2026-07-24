@@ -71,6 +71,7 @@
 - [x] Railway deployment runbook.
 - [x] Backup/restore runbook.
 - [x] Dry-run runbook перенесення PostgreSQL і Bucket зі staging у production без виконання переносу.
+- [x] План GitHub-релізу й розгортання production у Railway-акаунті замовника.
 - [x] Реєстр відкритих питань до замовника.
 - [x] Зафіксовано staging-backlog і порядок перенесення перевіреного стану в production.
 - [ ] Фінальна приймальна перевірка на production-домені.

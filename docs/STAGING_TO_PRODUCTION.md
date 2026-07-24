@@ -2,6 +2,10 @@
 
 Ця процедура готує контрольоване перенесення перевірених даних GeoPartners з Railway staging у production. До рішення замовника вона використовується лише як план і для репетиції на тимчасових ресурсах. Чинний production не змінюється.
 
+Створення сервісів, GitHub release flow, variables, домен і передача доступів
+до Railway-акаунта замовника описані окремо у
+[`CUSTOMER_RAILWAY_PRODUCTION_PLAN.md`](CUSTOMER_RAILWAY_PRODUCTION_PLAN.md).
+
 ## Що переносимо
 
 - PostgreSQL: користувачі, реєстрації, налаштування, робоча й тестова області, категорії, ділянки, аудит, версії та notification outbox.
