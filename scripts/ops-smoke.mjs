@@ -59,6 +59,8 @@ const smtpSender = createEmailSender({
     EMAIL_FROM: "GeoPartners <sender@example.com>",
     SMTP_HOST: "smtp.example.com",
     SMTP_PORT: "587",
+    EMAIL_HTTP_PROVIDER: "brevo",
+    BREVO_API_KEY: "inactive-brevo-key",
   },
   mailerFactory: (options) => {
     assert.equal(options.host, "smtp.example.com");
@@ -75,6 +77,8 @@ const brevoSender = createEmailSender({
     EMAIL_HTTP_PROVIDER: "brevo",
     EMAIL_FROM: "GeoPartners <sender@example.com>",
     BREVO_API_KEY: "brevo-test-key",
+    SMTP_HOST: "inactive-smtp.example.com",
+    SMTP_PORT: "587",
   },
   fetchImpl: async (url, init) => {
     brevoRequest = { url: String(url), init };
