@@ -116,22 +116,50 @@ Railway production підключається до гілки `main`, а не д
 
 ### Shared Variable
 
-Створити для environment `production`:
+Створити для environment `production` і поширити на `geopartners-web` та
+`geopartners-notifications`:
 
 ```text
 EMAIL_USE_SMTP=false
+BREVO_API_KEY=<production secret>
 ```
 
-Поділитися нею з `geopartners-web` і `geopartners-notifications`. У кожному
-сервісі має з'явитися reference:
+У кожному сервісі мають з'явитися references:
 
 ```text
 EMAIL_USE_SMTP=${{ shared.EMAIL_USE_SMTP }}
+BREVO_API_KEY=${{ shared.BREVO_API_KEY }}
 ```
 
 На Railway Hobby використовується Brevo HTTPS API. SMTP-реквізити можна
 залишити заздалегідь налаштованими для можливого переходу на Pro, але вони
 ігноруються, поки shared flag дорівнює `false`.
+
+### Передача Brevo API key
+
+Для production замовник створює **окремий** API key у власному Brevo-акаунті,
+наприклад `geopartners-production-railway`. Чинний staging SMTP key або
+будь-який персональний ключ команди у production не переноситься.
+
+Рекомендований порядок:
+
+1. Замовник створює production API key у Brevo.
+2. Замовник самостійно вводить його в Railway як shared variable
+   `BREVO_API_KEY`; у цьому разі секрет взагалі не передається команді.
+3. Shared variable поширюється тільки на `geopartners-web` і
+   `geopartners-notifications`.
+4. Виконується реальна тестова відправка через Brevo HTTPS API з обох сервісів.
+5. Після успішної перевірки `BREVO_API_KEY` позначається як sealed variable.
+
+Ключ не надсилається у GitHub, Codex/Telegram chat, email, документах або
+звичайних повідомленнях. Якщо замовник тимчасово доручає введення ключа
+команді, він передається через password manager або одноразове secret-посилання
+і обов'язково замінюється після production-приймання.
+
+Для ротації створюється новий Brevo API key, ним оновлюється shared variable,
+повторюється тестова відправка, і лише після цього попередній ключ видаляється
+у Brevo. Це дозволяє замінити один секрет одразу для обох сервісів без
+редагування GitHub або `.env`.
 
 ### Web
 
@@ -139,7 +167,7 @@ EMAIL_USE_SMTP=${{ shared.EMAIL_USE_SMTP }}
 - новий production `BETTER_AUTH_SECRET`;
 - `ADMIN_EMAIL`;
 - `DATABASE_URL=${{ Postgres.DATABASE_URL }}`;
-- `EMAIL_FROM`, `EMAIL_HTTP_PROVIDER=brevo`, `BREVO_API_KEY`;
+- `EMAIL_FROM`, `EMAIL_HTTP_PROVIDER=brevo`;
 - SMTP-блок як неактивний резерв;
 - production `GOOGLE_CLIENT_ID` і `GOOGLE_CLIENT_SECRET`;
 - Telegram variables, якщо web використовує пряме сповіщення;
@@ -149,8 +177,9 @@ EMAIL_USE_SMTP=${{ shared.EMAIL_USE_SMTP }}
 
 - `DATABASE_URL=${{ Postgres.DATABASE_URL }}`;
 - `APP_URL`, `ADMIN_EMAIL`;
-- той самий `EMAIL_FROM`, HTTP provider і Brevo API key;
+- той самий `EMAIL_FROM` і HTTP provider;
 - shared reference `EMAIL_USE_SMTP`;
+- shared reference `BREVO_API_KEY`;
 - `TELEGRAM_BOT_TOKEN` і `TELEGRAM_ADMIN_CHAT_ID`.
 
 ### Backup
