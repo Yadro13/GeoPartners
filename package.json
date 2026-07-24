@@ -17,6 +17,7 @@
     "backup:verify": "node scripts/verify-backup.mjs",
     "backup:restore": "node scripts/restore-database.mjs",
     "test:e2e": "node scripts/e2e-smoke.cjs",
+    "test:staging": "node scripts/staging-integration.mjs",
     "test:ops": "node scripts/ops-smoke.mjs",
     "notifications:dispatch": "node scripts/dispatch-notifications.mjs"
   },
