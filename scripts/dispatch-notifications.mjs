@@ -1,5 +1,5 @@
-import nodemailer from "nodemailer";
 import pg from "pg";
+import { createEmailSender } from "../src/lib/email-delivery.mjs";
 import { structuredError, structuredLog } from "./structured-log.mjs";
 
 const service = "geopartners-notifications";
@@ -8,13 +8,7 @@ let pool = null;
 try {
   if (!process.env.DATABASE_URL) throw Object.assign(new Error("Missing required configuration"), { code: "CONFIG_MISSING" });
   pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
-  const mailer = process.env.SMTP_HOST ? nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
-  }) : null;
-  await dispatch(pool, mailer);
+  await dispatch(pool, createEmailSender());
 } catch (error) {
   structuredLog(service, "error", "notifications.worker.failed", structuredError(error));
   process.exitCode = 1;
@@ -22,7 +16,7 @@ try {
   await pool?.end();
 }
 
-async function dispatch(database, mailer) {
+async function dispatch(database, emailSender) {
   const startedAt = Date.now();
   const { rows } = await database.query(`
     select id, channel, recipient, template, payload, attempts
@@ -39,7 +33,7 @@ async function dispatch(database, mailer) {
   let failed = 0;
   for (const notification of rows) {
     try {
-      await deliver(notification, mailer);
+      await deliver(notification, emailSender);
       await database.query("update notification_outbox set status = 'sent', sent_at = now(), last_error = null where id = $1", [notification.id]);
       sent += 1;
       structuredLog(service, "info", "notifications.delivery.sent", {
@@ -82,7 +76,7 @@ async function dispatch(database, mailer) {
   });
 }
 
-async function deliver(notification, mailer) {
+async function deliver(notification, emailSender) {
   if (notification.channel === "telegram") {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) throw Object.assign(new Error("Telegram is not configured"), { code: "TELEGRAM_CONFIG_MISSING" });
@@ -100,9 +94,8 @@ async function deliver(notification, mailer) {
     return;
   }
 
-  if (!mailer) throw Object.assign(new Error("SMTP is not configured"), { code: "SMTP_CONFIG_MISSING" });
   const message = buildEmail(notification);
-  await mailer.sendMail({ from: process.env.SMTP_FROM, to: notification.recipient, ...message });
+  await emailSender({ to: notification.recipient, ...message });
 }
 
 function buildEmail(notification) {

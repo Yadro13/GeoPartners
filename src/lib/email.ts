@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { createEmailSender } from "./email-delivery.mjs";
 import { serverLog } from "./server-log";
 
 export type EmailMessage = {
@@ -8,36 +8,21 @@ export type EmailMessage = {
   html?: string;
 };
 
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter() {
-  if (transporter) return transporter;
-  if (!process.env.SMTP_HOST) return null;
-
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-      : undefined,
-  });
-
-  return transporter;
-}
+let deliverEmail: ReturnType<typeof createEmailSender> | null = null;
 
 export async function sendEmail(message: EmailMessage) {
-  const mailer = getTransporter();
-  if (!mailer) {
-    if (process.env.NODE_ENV !== "production") {
+  try {
+    deliverEmail ??= createEmailSender();
+    await deliverEmail(message);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production" && isMissingConfiguration(error)) {
       serverLog("info", "email.preview.skipped", { transportConfigured: false });
       return;
     }
-    throw new Error("SMTP is not configured");
+    throw error;
   }
+}
 
-  await mailer.sendMail({
-    from: process.env.SMTP_FROM ?? "GeoPartners <no-reply@localhost>",
-    ...message,
-  });
+function isMissingConfiguration(error: unknown) {
+  return error instanceof Error && "code" in error && typeof error.code === "string" && error.code.endsWith("_MISSING");
 }

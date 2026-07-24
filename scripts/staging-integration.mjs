@@ -121,6 +121,8 @@ function startServer() {
     APP_URL: baseUrl,
     BETTER_AUTH_URL: baseUrl,
     ADMIN_EMAIL: adminEmail,
+    EMAIL_USE_SMTP: "true",
+    EMAIL_FROM: "GeoPartners staging E2E <no-reply@example.invalid>",
     SMTP_HOST: mailpitHost,
     SMTP_PORT: "1025",
     SMTP_SECURE: "false",
