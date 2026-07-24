@@ -5,6 +5,7 @@ const path = require("node:path");
 const os = require("node:os");
 
 const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
+const appOrigin = new URL(baseUrl).origin;
 
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH });
@@ -45,7 +46,11 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.getByPlaceholder("Ділянка або користувач").fill("Олена");
   await page.getByText("Олена Коваль").waitFor();
   assert((await page.locator(".audit-row").count()) === 1, "audit search filters by actor");
+  await page.getByPlaceholder("Ділянка або користувач").fill("подія-якої-немає");
+  await page.getByText("Подій за цими параметрами немає.", { exact: true }).waitFor();
+  assert((await page.locator(".audit-row").count()) === 0, "audit search has an explicit empty state");
   await page.getByPlaceholder("Ділянка або користувач").fill("");
+  await page.locator(".audit-row").first().waitFor();
   await page.locator(".audit-row summary").first().click();
   await page.getByText("Файли пакета").waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-audit-log.png") });
@@ -63,6 +68,13 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
   await page.getByRole("heading", { name: "Налаштування", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Імпортувати дані" }).click();
+  assert(await page.getByRole("dialog").evaluate((dialog) => dialog.contains(document.activeElement)), "modal moves keyboard focus inside");
+  await page.keyboard.press("Shift+Tab");
+  assert(await page.getByRole("dialog").evaluate((dialog) => dialog.contains(document.activeElement)), "modal traps backward keyboard focus");
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  assert(await page.getByRole("button", { name: "Імпортувати дані" }).evaluate((button) => button === document.activeElement), "modal returns focus to its trigger");
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: "damaged.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
   await page.getByText("damaged.zip: вміст файлу не відповідає формату ZIP.").waitFor();
@@ -357,7 +369,6 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.getByTitle("Профіль").click();
   assert((await page.getByText("Google", { exact: true }).count()) === 0, "administrator profile remains password-only");
 
-  const appOrigin = new URL(baseUrl).origin;
   await page.goto(`${appOrigin}/sign-in`, { waitUntil: "domcontentloaded" });
   assert((await page.getByRole("button", { name: "Увійти через Google", exact: true }).count()) === 0, "sign-in hides Google until OAuth is configured");
   await page.getByRole("link", { name: "Забули пароль?", exact: true }).click();
@@ -369,6 +380,18 @@ const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
   await page.goto(`${appOrigin}/sign-up`, { waitUntil: "domcontentloaded" });
   assert((await page.getByRole("button", { name: "Зареєструватися через Google", exact: true }).count()) === 0, "sign-up hides Google until OAuth is configured");
   console.log("stage=oauth-ui");
+
+  const statePage = await context.newPage();
+  await statePage.goto(`${appOrigin}/missing-e2e-page`, { waitUntil: "domcontentloaded" });
+  await statePage.getByRole("heading", { name: "Сторінку не знайдено", exact: true }).waitFor();
+  assert(await statePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "desktop not-found state has no horizontal overflow");
+  await statePage.setViewportSize({ width: 390, height: 844 });
+  await statePage.reload({ waitUntil: "domcontentloaded" });
+  await statePage.getByRole("heading", { name: "Сторінку не знайдено", exact: true }).waitFor();
+  assert(await statePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile not-found state has no horizontal overflow");
+  await statePage.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-not-found.png") });
+  await statePage.close();
+  console.log("stage=system-states");
 
   assert(errors.length === 0, `browser console is clean: ${errors.join(" | ")}`);
   console.log(JSON.stringify({ ok: true, desktopPlots: 4, mobile: dimensions, downloads: ["csv", "pdf", "docx"] }));

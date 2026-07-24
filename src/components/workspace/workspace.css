@@ -691,6 +691,7 @@
   border: 1px dashed var(--line);
   color: var(--muted);
   display: flex;
+  flex-direction: column;
   gap: 10px;
   justify-content: center;
   min-height: 180px;
@@ -1265,6 +1266,10 @@
 .file-drop span {
   color: var(--muted);
   font-size: 11px;
+}
+
+.audit-state p {
+  margin: 0;
 }
 
 .file-drop:disabled {

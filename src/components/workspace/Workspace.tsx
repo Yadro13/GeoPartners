@@ -64,18 +64,33 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
   const removePlot = useCallback(async (target: PlotFeature) => {
     if (!canDeletePlots) { setToast("Видалення ділянок доступне лише адміністратору."); return; }
     if (!window.confirm(`Видалити ділянку ${target.properties.cadastralNumber}?`)) return;
-    if (!preview) {
-      const response = await fetch(`/api/plots/${encodeURIComponent(target.properties.id)}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Не вдалося видалити ділянку.");
+    try {
+      if (!preview) {
+        const response = await fetch(`/api/plots/${encodeURIComponent(target.properties.id)}`, { method: "DELETE" });
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error ?? "Не вдалося видалити ділянку.");
+      }
+      setPlots((current) => current.filter(({ properties }) => properties.id !== target.properties.id));
+      setSelectedId((current) => current === target.properties.id ? null : current); setModal(null); setToast("Ділянку видалено.");
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "Не вдалося видалити ділянку. Спробуйте ще раз.");
     }
-    setPlots((current) => current.filter(({ properties }) => properties.id !== target.properties.id));
-    setSelectedId((current) => current === target.properties.id ? null : current); setModal(null); setToast("Ділянку видалено.");
   }, [canDeletePlots, preview]);
 
   const persistCategories = useCallback(async (next: Record<string, CategoryDefinition>) => {
-    if (!canManageCategories) { setToast("Керування категоріями доступне лише адміністратору."); return; }
-    setCategories(next);
-    if (!preview) await fetch("/api/categories", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+    if (!canManageCategories) { setToast("Керування категоріями доступне лише адміністратору."); return false; }
+    try {
+      if (!preview) {
+        const response = await fetch("/api/categories", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error ?? "Не вдалося зберегти категорії.");
+      }
+      setCategories(next);
+      return true;
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "Не вдалося зберегти категорії. Спробуйте ще раз.");
+      return false;
+    }
   }, [canManageCategories, preview]);
 
   const importPlots = async (result: ImportResult) => {
@@ -90,7 +105,7 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
       const geometryErrors = validatePolygonGeometry(item.geometry).issues.filter(({ level }) => level === "error");
       if (geometryErrors.length) throw new Error(`${item.properties.cadastralNumber}: ${geometryErrors.map(({ message }) => message).join(" ")}`);
     }
-    await persistCategories(mergedCategories);
+    if (!await persistCategories(mergedCategories)) throw new Error("Імпорт зупинено: не вдалося зберегти категорії.");
     let added = 0; let updated = 0;
     for (const next of prepared) {
       const duplicate = plots.find(({ properties }) => properties.id === next.properties.id);
@@ -146,25 +161,37 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
   const updateCategory = (id: string, changes: Partial<CategoryDefinition>) => void persistCategories({ ...categories, [id]: { ...categories[id], ...changes } });
   const setWorkspace = useCallback(async (nextWorkspace: DataWorkspace) => {
     if (preview || nextWorkspace === workspace) return;
-    const response = await fetch("/api/workspace", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workspace: nextWorkspace }) });
-    const body = await response.json().catch(() => null);
-    if (!response.ok) { setToast(body?.error ?? "Не вдалося перемкнути базу."); return; }
-    window.location.reload();
+    try {
+      const response = await fetch("/api/workspace", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workspace: nextWorkspace }) });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error ?? "Не вдалося перемкнути базу.");
+      window.location.reload();
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "Не вдалося перемкнути базу. Спробуйте ще раз.");
+    }
   }, [preview, workspace]);
   const setTestWorkspaceEnabled = useCallback(async (enabled: boolean) => {
     if (!canManageWorkspaces || preview) return;
-    const response = await fetch("/api/workspace/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ testWorkspaceEnabled: enabled }) });
-    const body = await response.json().catch(() => null);
-    if (!response.ok) { setToast(body?.error ?? "Не вдалося змінити налаштування баз."); return; }
-    window.location.reload();
+    try {
+      const response = await fetch("/api/workspace/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ testWorkspaceEnabled: enabled }) });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error ?? "Не вдалося змінити налаштування баз.");
+      window.location.reload();
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "Не вдалося змінити налаштування баз. Спробуйте ще раз.");
+    }
   }, [canManageWorkspaces, preview]);
   const clearSandbox = useCallback(async () => {
     if (!canManageWorkspaces || preview || !window.confirm("Очистити всі ділянки, категорії, документи та журнал тестової бази?")) return;
-    const response = await fetch("/api/workspace/sandbox", { method: "DELETE" });
-    const body = await response.json().catch(() => null);
-    if (!response.ok) { setToast(body?.error ?? "Не вдалося очистити тестову базу."); return; }
-    if (workspace === "sandbox") window.location.reload();
-    else setToast(`Тестову базу очищено. Видалено ділянок: ${body?.deletedPlots ?? 0}.`);
+    try {
+      const response = await fetch("/api/workspace/sandbox", { method: "DELETE" });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error ?? "Не вдалося очистити тестову базу.");
+      if (workspace === "sandbox") window.location.reload();
+      else setToast(`Тестову базу очищено. Видалено ділянок: ${body?.deletedPlots ?? 0}.`);
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "Не вдалося очистити тестову базу. Спробуйте ще раз.");
+    }
   }, [canManageWorkspaces, preview, workspace]);
 
   const actions: WorkspaceActions = {
@@ -175,7 +202,7 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
     exportGeoJson, exportCsv, setBaseMap,
     toggleCategory: (id, visible) => { if (canManageCategories) updateCategory(id, { visible }); else setCategories((current) => ({ ...current, [id]: { ...current[id], visible } })); }, updateCategory,
     addCategory: () => { const id = `category_${Date.now()}`; void persistCategories({ ...categories, [id]: { name: "Нова категорія", color: "#3979a8", visible: true } }); },
-    removeCategory: (id) => { if (id === "default" || !window.confirm(`Видалити категорію «${categories[id]?.name}»?`)) return; const next = { ...categories }; delete next[id]; setPlots((current) => current.map((plot) => plot.properties.category === id ? { ...plot, properties: { ...plot.properties, category: "default" } } : plot)); void persistCategories(next); },
+    removeCategory: (id) => { if (id === "default" || !window.confirm(`Видалити категорію «${categories[id]?.name}»?`)) return; const next = { ...categories }; delete next[id]; void persistCategories(next).then((saved) => { if (saved) setPlots((current) => current.map((plot) => plot.properties.category === id ? { ...plot, properties: { ...plot.properties, category: "default" } } : plot)); }); },
     setWorkspace, setTestWorkspaceEnabled, clearSandbox,
   };
 

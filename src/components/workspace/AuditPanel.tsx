@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, FileInput, History, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileInput, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { demoPlots } from "@/data/demo";
 import type { AuditAction, AuditEntry, VersionComparison } from "@/lib/audit";
 import type { BaseMapId } from "./types";
@@ -36,12 +36,13 @@ export function AuditPanel({ preview, baseMap, canRestore, onRestore, workspace 
 
   const openComparison = async (entry: AuditEntry) => { setComparisonId(entry.id); setCompareError(""); setOperationMessage(""); try { if (preview) { setComparison(demoComparison(entry)); return; } const response = await fetch(`/api/audit/${encodeURIComponent(entry.id)}/version`); const body = await response.json().catch(() => null); if (!response.ok) throw new Error(body?.error ?? "Не вдалося підготувати порівняння."); setComparison(body as VersionComparison); } catch (reason) { setOperationMessage(reason instanceof Error ? reason.message : "Не вдалося підготувати порівняння."); setComparisonId(null); } };
   const restore = async () => { if (!comparison) return; setRestoring(true); setCompareError(""); try { await onRestore(comparison.auditId); setOperationMessage("Версію успішно відновлено."); setComparison(null); setComparisonId(null); setRefresh((value) => value + 1); } catch (reason) { setCompareError(reason instanceof Error ? reason.message : "Не вдалося відновити версію."); } finally { setRestoring(false); } };
+  const retry = () => { setError(""); setLoading(true); setRefresh((value) => value + 1); };
 
   const pages = Math.max(1, Math.ceil(total / limit));
   return <section className="workspace-page audit-page"><header className="workspace-page__header"><div><span className="eyebrow">{workspace === "sandbox" ? "Історія тестової бази" : "Історія робочої бази"}</span><h1>Журнал змін</h1></div><span className="audit-total">{total} записів</span></header>
     <div className="audit-toolbar"><label className="search-field"><Search size={18} aria-hidden="true" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); setLoading(true); setError(""); }} placeholder="Ділянка або користувач" /></label><div className="segmented-control" role="group" aria-label="Тип подій">{([['all','Усі'],['plots','Ділянки'],['import','Імпорти']] as const).map(([id, label]) => <button type="button" data-active={scope === id} onClick={() => { setScope(id); setPage(1); setLoading(true); setError(""); }} key={id}>{label}</button>)}</div></div>
     {operationMessage ? <p className="form-message" role="status">{operationMessage}</p> : null}
-    {loading ? <div className="audit-state"><History size={24} /><p>Завантаження журналу…</p></div> : error ? <div className="audit-state" data-tone="error"><History size={24} /><p>{error}</p></div> : !items.length ? <div className="audit-state"><History size={24} /><p>Подій за цими параметрами немає.</p></div> : <div className="audit-list">{items.map((entry) => <AuditRow entry={entry} canRestore={canRestore} loading={comparisonId === entry.id && !comparison} onCompare={() => openComparison(entry)} key={entry.id} />)}</div>}
+    {loading ? <div className="audit-state"><History size={24} /><p>Завантаження журналу…</p></div> : error ? <div className="audit-state" data-tone="error"><History size={24} /><p>{error}</p><button className="command-button" type="button" onClick={retry}><RefreshCw size={16} />Спробувати ще раз</button></div> : !items.length ? <div className="audit-state"><History size={24} /><p>Подій за цими параметрами немає.</p></div> : <div className="audit-list">{items.map((entry) => <AuditRow entry={entry} canRestore={canRestore} loading={comparisonId === entry.id && !comparison} onCompare={() => openComparison(entry)} key={entry.id} />)}</div>}
     {total > limit ? <footer className="audit-pagination"><button className="icon-button" type="button" aria-label="Попередня сторінка" disabled={page <= 1} onClick={() => { setPage((value) => value - 1); setLoading(true); }}><ChevronLeft size={18} /></button><span>{page} з {pages}</span><button className="icon-button" type="button" aria-label="Наступна сторінка" disabled={page >= pages} onClick={() => { setPage((value) => value + 1); setLoading(true); }}><ChevronRight size={18} /></button></footer> : null}
     {comparison ? <VersionCompareDialog comparison={comparison} baseMap={baseMap} busy={restoring} error={compareError} onClose={() => { if (!restoring) { setComparison(null); setComparisonId(null); } }} onConfirm={restore} /> : null}
   </section>;
