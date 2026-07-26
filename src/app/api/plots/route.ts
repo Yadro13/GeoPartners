@@ -12,7 +12,6 @@ import { getDataWorkspace } from "@/lib/data-workspace";
 export async function GET() {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
-  if (!hasPermission(currentUser, "plots.create")) return NextResponse.json({ error: "Недостатньо прав для створення ділянки." }, { status: 403 });
   const workspace = await getDataWorkspace();
   return NextResponse.json((await db.select().from(plot).where(eq(plot.workspace, workspace))).map(plotRowToFeature));
 }
@@ -20,6 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
+  if (!hasPermission(currentUser, "plots.create")) return NextResponse.json({ error: "Недостатньо прав для створення ділянки." }, { status: 403 });
   try {
     const workspace = await getDataWorkspace();
     const feature = parsePlotFeature(await request.json());

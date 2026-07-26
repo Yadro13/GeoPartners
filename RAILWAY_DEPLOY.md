@@ -123,10 +123,13 @@ Only an administrator can show or hide the test database and clear all sandbox p
 
 ## Roles and permissions
 
-- `user`: view the map and audit log, create and edit plots, toggle local layer visibility, generate reports, export data, download documents, and manage their own profile.
-- `admin`: all user permissions plus bulk GeoJSON/PDF import, plot deletion, version restoration, shared category management, registration approval, and user administration.
+- `user` with `read`: view the map, plots, documents and audit log, toggle local layer visibility, generate reports, export data, and manage their own profile.
+- `user` with `edit`: all read permissions plus manual plot creation and editing.
+- `admin`: full access regardless of stored user access level, including bulk GeoJSON/PDF import, plot deletion, version restoration, shared category management, registration approval, and user administration.
 
-The same permissions are enforced by API routes. Hiding a command in the interface is not used as the authorization boundary.
+Every new non-admin user defaults to `read`. An administrator changes the level
+from the user registry. The same permissions are enforced by API routes; hiding
+a command in the interface is not used as the authorization boundary.
 
 ## Authentication integrations
 

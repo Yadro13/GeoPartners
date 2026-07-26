@@ -19,5 +19,5 @@ export default async function HomePage() {
     db.select().from(category).where(eq(category.workspace, workspace)),
   ]);
   const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-  return <Workspace initialPlots={plotRows.map(plotRowToFeature)} initialCategories={categoryRowsToRecord(categoryRows)} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
+  return <Workspace initialPlots={plotRows.map(plotRowToFeature)} initialCategories={categoryRowsToRecord(categoryRows)} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role, accessLevel: currentUser.accessLevel }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
 }

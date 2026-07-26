@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { coreTables } from "./backup-utils.mjs";
 import { createEmailSender, emailTransportMode } from "../src/lib/email-delivery.mjs";
+import { hasPermission } from "../src/lib/permissions.ts";
 import { structuredLog } from "./structured-log.mjs";
 
 let output = "";
@@ -51,6 +52,13 @@ assert.equal(emailTransportMode({ EMAIL_USE_SMTP: "false" }), "brevo");
 assert.equal(emailTransportMode({ EMAIL_USE_SMTP: "false", EMAIL_HTTP_PROVIDER: "resend" }), "resend");
 assert.throws(() => emailTransportMode({ EMAIL_USE_SMTP: "sometimes" }), { code: "EMAIL_TRANSPORT_INVALID" });
 assert.throws(() => emailTransportMode({ EMAIL_USE_SMTP: "false", EMAIL_HTTP_PROVIDER: "other" }), { code: "EMAIL_PROVIDER_INVALID" });
+
+assert.equal(hasPermission({ role: "user", accessLevel: "read" }, "plots.create"), false);
+assert.equal(hasPermission({ role: "user", accessLevel: "read" }, "plots.update"), false);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.create"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.update"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.delete"), false);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "plots.delete"), true);
 
 const smtpMessages = [];
 const smtpSender = createEmailSender({
@@ -116,7 +124,7 @@ await assert.rejects(
   { code: "BREVO_CONFIG_MISSING" },
 );
 
-console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports"] }));
+console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports", "access-levels"] }));
 
 function testMessage() {
   return {

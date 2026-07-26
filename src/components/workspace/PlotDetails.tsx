@@ -6,7 +6,7 @@ type PlotDetailsProps = {
   plot: PlotFeature | null;
   compact?: boolean;
   categories: Record<string, CategoryDefinition>;
-  onEdit: (plot: PlotFeature) => void;
+  onEdit?: (plot: PlotFeature) => void;
   onDocuments: (plot: PlotFeature) => void;
   onOpenCard: (plot: PlotFeature) => void;
 };
@@ -26,9 +26,9 @@ export function PlotDetails({ plot, compact = false, categories, onEdit, onDocum
           <span className="eyebrow">Кадастровий номер</span>
           <h2>{properties.cadastralNumber}</h2>
         </div>
-        <button className="icon-button" type="button" onClick={() => onEdit(plot)} title="Редагувати ділянку" aria-label="Редагувати ділянку">
+        {onEdit ? <button className="icon-button" type="button" onClick={() => onEdit(plot)} title="Редагувати ділянку" aria-label="Редагувати ділянку">
           <Pencil size={18} aria-hidden="true" />
-        </button>
+        </button> : null}
       </header>
 
       <div className="category-line">

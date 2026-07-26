@@ -7,7 +7,7 @@ export type PlotFeature = Feature<Polygon, PlotProperties>;
 
 export type WorkspaceSection = "map" | "layers" | "reports" | "history" | "users" | "settings" | "profile";
 export type BaseMapId = "streets" | "light" | "satellite";
-export type WorkspaceUser = { name: string; email: string; role: "user" | "admin" };
+export type WorkspaceUser = { name: string; email: string; role: "user" | "admin"; accessLevel: "read" | "edit" };
 
 export type WorkspaceActions = {
   select: (id: string) => void;
@@ -46,5 +46,6 @@ export type WorkspaceViewProps = {
   preview: boolean;
   workspace: DataWorkspace;
   testWorkspaceEnabled: boolean;
+  canEditPlots: boolean;
   actions: WorkspaceActions;
 };

@@ -200,7 +200,7 @@ async function mailpitText(id) {
 
 async function databaseUser(email) {
   const result = await client.query(
-    `select id, role, approval_status as "approvalStatus", email_verified as "emailVerified"
+    `select id, role, access_level as "accessLevel", approval_status as "approvalStatus", email_verified as "emailVerified"
        from "user" where email = $1`,
     [email],
   );
@@ -251,7 +251,7 @@ async function run() {
   await signUp(adminEmail, "Staging E2E Admin");
   await verifyEmail(adminEmail);
   const admin = await databaseUser(adminEmail);
-  assert(admin?.role === "admin" && admin.approvalStatus === "approved" && admin.emailVerified, "Temporary administrator was not provisioned correctly.");
+  assert(admin?.role === "admin" && admin.accessLevel === "edit" && admin.approvalStatus === "approved" && admin.emailVerified, "Temporary administrator was not provisioned correctly.");
   const adminJar = await signIn(adminEmail);
   logStep("administrator signup, email verification and sign-in passed");
 
@@ -259,7 +259,7 @@ async function run() {
   await verifyEmail(userEmail);
   const applicant = await databaseUser(userEmail);
   const registration = await registrationFor(userEmail);
-  assert(applicant?.role === "user" && applicant.approvalStatus === "pending" && applicant.emailVerified, "Applicant state after verification is invalid.");
+  assert(applicant?.role === "user" && applicant.accessLevel === "read" && applicant.approvalStatus === "pending" && applicant.emailVerified, "Applicant state after verification is invalid.");
   assert(registration?.status === "pending", "Registration request was not created.");
   const userJar = await signIn(userEmail);
   await request("/api/plots", { jar: userJar, expected: [401] });
@@ -284,12 +284,21 @@ async function run() {
   await request("/api/plots", { method: "POST", jar: adminJar, expected: [201], json: testPlot() });
   const sandboxPlots = await request("/api/plots", { jar: userJar });
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");
+  await request("/api/plots", { method: "POST", jar: userJar, expected: [403], json: testPlot("Read-only create attempt") });
+  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, expected: [403], json: testPlot("Read-only update attempt") });
 
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "production" } });
   const productionPlots = await request("/api/plots", { jar: adminJar });
   assert(Array.isArray(productionPlots.payload) && !productionPlots.payload.some((item) => item.properties?.id === plotId), "Sandbox plot leaked into the production workspace.");
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
 
+  await request(`/api/admin/users/${applicant.id}`, {
+    method: "PATCH",
+    jar: adminJar,
+    json: { role: "user", accessLevel: "edit", approvalStatus: "approved" },
+  });
+  const editor = await databaseUser(userEmail);
+  assert(editor?.accessLevel === "edit", "Administrator did not grant plot editing access.");
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Updated by E2E user") });
   const audit = await request(`/api/audit?q=${encodeURIComponent(cadastralNumber)}&scope=plots&limit=30`, { jar: userJar });
   const updatedAudit = audit.payload.items?.find((item) => item.action === "plot.updated" && item.entityId === plotId);
@@ -303,19 +312,19 @@ async function run() {
   const restoredPlots = await request("/api/plots", { jar: userJar });
   const restored = restoredPlots.payload.find((item) => item.properties?.id === plotId);
   assert(restored?.properties?.name === "Staging E2E plot", "Administrator restore did not recover the prior plot version.");
-  logStep("workspace isolation, CRUD, audit, restore and role permissions passed");
+  logStep("read-only default, editor grant, workspace isolation, CRUD, audit, restore and role permissions passed");
 
   await request(`/api/admin/users/${applicant.id}`, {
     method: "PATCH",
     jar: adminJar,
-    json: { role: "user", approvalStatus: "suspended" },
+    json: { role: "user", accessLevel: "read", approvalStatus: "suspended" },
   });
   await request("/api/plots", { jar: userJar, expected: [401] });
   await request(`/api/admin/users/${admin.id}`, {
     method: "PATCH",
     jar: adminJar,
     expected: [409],
-    json: { role: "user", approvalStatus: "suspended" },
+    json: { role: "user", accessLevel: "read", approvalStatus: "suspended" },
   });
   logStep("suspension and protected administrator rules passed");
 

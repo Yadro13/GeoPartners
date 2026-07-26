@@ -32,8 +32,8 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
   const [baseMap, setBaseMap] = useState<BaseMapId>(previewSnapshot?.baseMap ?? "streets");
   const [modal, setModal] = useState<Modal>(null);
   const [toast, setToast] = useState("");
-  const currentUser = user ?? { name: "Демо Адміністратор", email: "admin@example.com", role: "admin" as const };
-  const canDeletePlots = hasPermission(currentUser, "plots.delete"); const canImport = hasPermission(currentUser, "imports.run"); const canManageCategories = hasPermission(currentUser, "categories.manage"); const canRestoreVersions = hasPermission(currentUser, "versions.restore"); const canManageWorkspaces = hasPermission(currentUser, "workspaces.manage");
+  const currentUser = user ?? { name: "Демо Адміністратор", email: "admin@example.com", role: "admin" as const, accessLevel: "edit" as const };
+  const canEditPlots = hasPermission(currentUser, "plots.create") && hasPermission(currentUser, "plots.update"); const canDeletePlots = hasPermission(currentUser, "plots.delete"); const canImport = hasPermission(currentUser, "imports.run"); const canManageCategories = hasPermission(currentUser, "categories.manage"); const canRestoreVersions = hasPermission(currentUser, "versions.restore"); const canManageWorkspaces = hasPermission(currentUser, "workspaces.manage");
 
   useEffect(() => {
     if (preview) localStorage.setItem("geopartners-preview", JSON.stringify({ plots, categories, baseMap }));
@@ -53,13 +53,14 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
   const selectedPlot = plots.find(({ properties }) => properties.id === selectedId) ?? null;
 
   const persistPlot = useCallback(async (next: PlotFeature, exists = false) => {
+    if (!canEditPlots) throw new Error("Ваш рівень доступу дозволяє лише перегляд ділянок.");
     if (!preview) {
       const response = await fetch(exists ? `/api/plots/${encodeURIComponent(next.properties.id)}` : "/api/plots", { method: exists ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "Не вдалося зберегти ділянку.");
     }
     setPlots((current) => exists ? current.map((plot) => plot.properties.id === next.properties.id ? next : plot) : [...current, next]);
     setSelectedId(next.properties.id); setModal(null); setToast(exists ? "Зміни ділянки збережено." : "Ділянку додано.");
-  }, [preview]);
+  }, [canEditPlots, preview]);
 
   const removePlot = useCallback(async (target: PlotFeature) => {
     if (!canDeletePlots) { setToast("Видалення ділянок доступне лише адміністратору."); return; }
@@ -196,7 +197,7 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
 
   const actions: WorkspaceActions = {
     select: setSelectedId, setQuery, setSection: setActiveSection,
-    openAdd: () => setModal({ type: "add" }), openEdit: (plot) => setModal({ type: "edit", plot }), remove: (plot) => void removePlot(plot),
+    openAdd: () => { if (canEditPlots) setModal({ type: "add" }); else setToast("Ваш рівень доступу дозволяє лише перегляд ділянок."); }, openEdit: (plot) => { if (canEditPlots) setModal({ type: "edit", plot }); else setToast("Ваш рівень доступу дозволяє лише перегляд ділянок."); }, remove: (plot) => void removePlot(plot),
     openImport: () => { if (canImport) setModal({ type: "import" }); else setToast("Імпорт доступний лише адміністратору."); }, openDocuments: (plot) => setModal({ type: "documents", plot }), openCard: (plot) => setModal({ type: "card", plot }), openNotifications: () => setModal({ type: "notifications" }),
     restoreAuditEntry,
     exportGeoJson, exportCsv, setBaseMap,
@@ -208,14 +209,14 @@ export function Workspace({ initialPlots, initialCategories, user, googleEnabled
 
   if (isMobile === null) return <main className="workspace-loading" aria-live="polite"><span className="workspace-loading__mark">GP</span><span>Підготовка робочого простору…</span></main>;
 
-  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, actions };
+  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, actions };
 
   return <>{isMobile ? <MobileWorkspace {...sharedProps} /> : <DesktopWorkspace {...sharedProps} />}
     {modal?.type === "add" ? <WorkspaceModal title="Нова ділянка" description="Заповніть картку та намалюйте контур на карті." onClose={() => setModal(null)} wide><PlotForm plot={null} neighbors={plots} categories={categories} baseMap={baseMap} onSave={(plot) => persistPlot(plot)} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "edit" ? <WorkspaceModal title="Редагування ділянки" onClose={() => setModal(null)} wide><PlotForm plot={modal.plot} neighbors={plots.filter(({ properties }) => properties.id !== modal.plot.properties.id)} categories={categories} baseMap={baseMap} onSave={(plot) => persistPlot(plot, true)} onDelete={canDeletePlots ? () => void removePlot(modal.plot) : undefined} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "import" ? <WorkspaceModal title="Імпорт ділянок і документів" description="Виберіть GeoJSON/PDF або ZIP з таким пакетом. Архів буде розпаковано перед перевіркою." onClose={() => setModal(null)} wide><ImportForm onImport={importFiles} onCancel={() => setModal(null)} existingPlots={plots} categories={categories} baseMap={baseMap} /></WorkspaceModal> : null}
     {modal?.type === "documents" ? <WorkspaceModal title="Документи ділянки" description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)}><div className="document-list"><button type="button" onClick={() => downloadText(JSON.stringify(modal.plot, null, 2), `${modal.plot.properties.cadastralNumber.replaceAll(":", "")}.geojson`, "application/geo+json")}><FileText size={20} /><span><strong>Геометрія ділянки</strong><small>GeoJSON</small></span><Download size={18} /></button>{modal.plot.properties.documentUrl ? <a href={modal.plot.properties.documentUrl} target="_blank" rel="noreferrer"><FileText size={20} /><span><strong>{modal.plot.properties.documentName ?? "Документ ділянки"}</strong><small>PDF</small></span><Download size={18} /></a> : <p>PDF для цієї ділянки ще не прикріплено.</p>}</div></WorkspaceModal> : null}
-    {modal?.type === "card" ? <WorkspaceModal title="Картка ділянки" onClose={() => setModal(null)}><PlotDetails plot={modal.plot} categories={categories} onEdit={(plot) => setModal({ type: "edit", plot })} onDocuments={(plot) => setModal({ type: "documents", plot })} onOpenCard={() => undefined} /></WorkspaceModal> : null}
+    {modal?.type === "card" ? <WorkspaceModal title="Картка ділянки" onClose={() => setModal(null)}><PlotDetails plot={modal.plot} categories={categories} onEdit={canEditPlots ? (plot) => setModal({ type: "edit", plot }) : undefined} onDocuments={(plot) => setModal({ type: "documents", plot })} onOpenCard={() => undefined} /></WorkspaceModal> : null}
     {modal?.type === "notifications" ? <WorkspaceModal title="Сповіщення" onClose={() => setModal(null)}><NotificationPanel isAdmin={currentUser.role === "admin"} preview={preview} /></WorkspaceModal> : null}
     {toast ? <div className="workspace-toast" role="status">{toast}</div> : null}
   </>;

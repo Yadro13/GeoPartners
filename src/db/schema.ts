@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, foreignKey, index, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+export const userAccessLevelEnum = pgEnum("user_access_level", ["read", "edit"]);
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected", "suspended"]);
 export const registrationMethodEnum = pgEnum("registration_method", ["password", "google"]);
 export const notificationChannelEnum = pgEnum("notification_channel", ["email", "telegram"]);
@@ -17,6 +18,7 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   role: userRoleEnum("role").default("user").notNull(),
+  accessLevel: userAccessLevelEnum("access_level").default("read").notNull(),
   approvalStatus: approvalStatusEnum("approval_status").default("pending").notNull(),
   registrationMethod: registrationMethodEnum("registration_method").default("password").notNull(),
   reviewComment: text("review_comment"),

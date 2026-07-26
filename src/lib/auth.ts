@@ -84,6 +84,7 @@ export const auth = betterAuth({
     changeEmail: { enabled: false },
     additionalFields: {
       role: { type: "string", defaultValue: "user", input: false },
+      accessLevel: { type: "string", defaultValue: "read", input: false },
       approvalStatus: { type: "string", defaultValue: "pending", input: false },
       registrationMethod: { type: "string", defaultValue: "password", input: false },
       reviewComment: { type: "string", required: false, input: false },
@@ -100,6 +101,7 @@ export const auth = betterAuth({
             data: {
               ...newUser,
               role: isAdmin ? "admin" : "user",
+              accessLevel: isAdmin ? "edit" : "read",
               approvalStatus: isAdmin ? "approved" : "pending",
             },
           };
