@@ -315,7 +315,7 @@ async function run() {
   assert(clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === "", "Deleted status was not cleared from the plot.");
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Updated by E2E user") });
   const audit = await request(`/api/audit?q=${encodeURIComponent(cadastralNumber)}&scope=plots&limit=30`, { jar: userJar });
-  const updatedAudit = audit.payload.items?.find((item) => item.action === "plot.updated" && item.entityId === plotId);
+  const updatedAudit = audit.payload.items?.filter((item) => item.action === "plot.updated" && item.entityId === plotId).at(-1);
   assert(updatedAudit?.id && updatedAudit.canRestore, "Updated plot version is missing from the audit log.");
 
   await request(`/api/audit/${updatedAudit.id}/restore`, { method: "POST", jar: userJar, expected: [403] });
