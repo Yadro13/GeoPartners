@@ -430,6 +430,10 @@ const appOrigin = new URL(baseUrl).origin;
 
   await page.goto(`${appOrigin}/sign-in`, { waitUntil: "domcontentloaded" });
   assert((await page.getByRole("button", { name: "Увійти через Google", exact: true }).count()) === 0, "sign-in hides Google until OAuth is configured");
+  await page.goto(`${appOrigin}/sign-in?error=account_not_linked`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Google-акаунт ще не підключено до цього облікового запису.", { exact: true }).waitFor();
+  await page.goto(`${appOrigin}/sign-in?error=FORBIDDEN`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Для цього облікового запису вхід через Google недоступний.", { exact: true }).waitFor();
   await page.getByRole("link", { name: "Забули пароль?", exact: true }).click();
   await page.getByRole("heading", { name: "Відновлення пароля", exact: true }).waitFor();
   assert((await page.getByRole("button", { name: "Надіслати посилання", exact: true }).count()) === 1, "password recovery form is available");
@@ -438,6 +442,8 @@ const appOrigin = new URL(baseUrl).origin;
   assert((await page.getByRole("link", { name: "Запросити нове посилання", exact: true }).count()) === 1, "invalid reset link has a recovery path");
   await page.goto(`${appOrigin}/sign-up`, { waitUntil: "domcontentloaded" });
   assert((await page.getByRole("button", { name: "Зареєструватися через Google", exact: true }).count()) === 0, "sign-up hides Google until OAuth is configured");
+  await page.goto(`${appOrigin}/sign-up?error=access_denied`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Вхід через Google скасовано.", { exact: true }).waitFor();
   console.log("stage=oauth-ui");
 
   const statePage = await context.newPage();
