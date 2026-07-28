@@ -20,6 +20,10 @@ export function DecisionForm({ requestId }: { requestId: string }) {
     });
     setLoading(null);
     if (!response.ok) {
+      if (response.status === 409) {
+        router.refresh();
+        return;
+      }
       const body = await response.json().catch(() => null) as { error?: string } | null;
       return setError(body?.error ?? "Не вдалося зберегти рішення.");
     }

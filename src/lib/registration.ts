@@ -30,17 +30,23 @@ export async function createRegistrationRequest(userId: string, method: Registra
 }
 
 async function notifyAdminAboutRegistration(input: { requestId: string; name: string; email: string; method: RegistrationMethod }) {
-  const adminEmail = process.env.ADMIN_EMAIL;
   const appUrl = process.env.APP_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
   const reviewUrl = `${appUrl}/admin/registrations/${input.requestId}`;
   const methodLabel = input.method === "google" ? "Google" : "email і пароль";
   const text = `Нова реєстрація в GeoPartners\nІм'я: ${input.name}\nEmail: ${input.email}\nСпосіб: ${methodLabel}\nПерегляд: ${reviewUrl}`;
+  const activeAdmins = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(and(eq(user.role, "admin"), eq(user.approvalStatus, "approved")));
+  const adminEmails = new Set(activeAdmins.map(({ email }) => email.trim().toLowerCase()).filter(Boolean));
+  const fallbackEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (!adminEmails.size && fallbackEmail) adminEmails.add(fallbackEmail);
 
   const tasks: Array<{ channel: "email" | "telegram"; recipient: string; promise: Promise<unknown> }> = [];
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     tasks.push({ channel: "telegram", recipient: process.env.TELEGRAM_ADMIN_CHAT_ID, promise: sendTelegramMessage(text, { text: "Переглянути заявку", url: reviewUrl }) });
   }
-  if (adminEmail) {
+  for (const adminEmail of adminEmails) {
     tasks.push({ channel: "email", recipient: adminEmail, promise: sendEmail({
       to: adminEmail,
       subject: "Нова заявка на доступ до GeoPartners",
@@ -69,12 +75,12 @@ async function notifyAdminAboutRegistration(input: { requestId: string; name: st
   serverLog("info", "registration.admin_notification.completed", { selected: tasks.length, sent: tasks.length - queued, queued });
 }
 
-export async function getPendingRegistration(requestId: string) {
+export async function getRegistration(requestId: string) {
   const rows = await db
     .select({ request: registrationRequest, applicant: user })
     .from(registrationRequest)
     .innerJoin(user, eq(registrationRequest.userId, user.id))
-    .where(and(eq(registrationRequest.id, requestId), eq(registrationRequest.status, "pending")))
+    .where(eq(registrationRequest.id, requestId))
     .limit(1);
   return rows[0] ?? null;
 }

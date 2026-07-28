@@ -35,6 +35,18 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=user-management");
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${baseUrl}?view=registration-result`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Підтверджено", { exact: true }).waitFor();
+  await page.getByText("Другий адміністратор", { exact: false }).waitFor();
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-registration-result.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByText("Доступ підтверджено після перевірки даних користувача та погодження рівня доступу.", { exact: true }).waitFor();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile registration result has no horizontal overflow");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-registration-result.png") });
+  console.log("stage=registration-result");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.removeItem("geopartners-preview"));
   await page.reload({ waitUntil: "domcontentloaded" });

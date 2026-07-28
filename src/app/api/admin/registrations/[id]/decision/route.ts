@@ -26,18 +26,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const now = new Date();
 
   const applicant = await db.transaction(async (tx) => {
-    const rows = await tx
-      .select({ request: registrationRequest, applicant: user })
-      .from(registrationRequest)
-      .innerJoin(user, eq(registrationRequest.userId, user.id))
+    const [claimed] = await tx
+      .update(registrationRequest)
+      .set({ status: parsed.data.decision, comment: parsed.data.comment, decidedAt: now, decidedBy: admin.id })
       .where(and(eq(registrationRequest.id, id), eq(registrationRequest.status, "pending")))
-      .limit(1);
-    const target = rows[0];
-    if (!target) return null;
+      .returning({ userId: registrationRequest.userId });
+    if (!claimed) return null;
 
-    await tx.update(registrationRequest).set({ status: parsed.data.decision, comment: parsed.data.comment, decidedAt: now, decidedBy: admin.id }).where(eq(registrationRequest.id, id));
-    await tx.update(user).set({ approvalStatus: parsed.data.decision, reviewComment: parsed.data.comment, reviewedAt: now, reviewedBy: admin.id }).where(eq(user.id, target.applicant.id));
-    return target.applicant;
+    const [target] = await tx.select().from(user).where(eq(user.id, claimed.userId)).limit(1);
+    if (!target) throw new Error("Applicant is missing for a claimed registration request.");
+    await tx.update(user).set({ approvalStatus: parsed.data.decision, reviewComment: parsed.data.comment, reviewedAt: now, reviewedBy: admin.id }).where(eq(user.id, target.id));
+    return target;
   });
 
   if (!applicant) return NextResponse.json({ error: "Заявка вже опрацьована або не існує." }, { status: 409 });

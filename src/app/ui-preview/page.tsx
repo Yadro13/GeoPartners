@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { RegistrationDecisionResult } from "@/components/admin/RegistrationDecisionResult";
 import { UserManagementTable } from "@/components/admin/UserManagementTable";
 import { Workspace } from "@/components/workspace/Workspace";
 import "../admin/admin.css";
@@ -11,6 +12,9 @@ export default async function UiPreviewPage({ searchParams }: { searchParams: Pr
       { id: "preview-pending", name: "Тестер", email: "tester@example.com", role: "user", accessLevel: "read", approvalStatus: "pending", registrationMethod: "password", registrationRequestId: "preview-request", createdAt: "2026-07-28T00:00:00.000Z", protected: false },
       { id: "preview-admin", name: "GeoPartners Administrator", email: "admin@example.com", role: "admin", accessLevel: "edit", approvalStatus: "approved", registrationMethod: "password", registrationRequestId: null, createdAt: "2026-07-22T00:00:00.000Z", protected: true },
     ]} /></section></main>;
+  }
+  if (view === "registration-result") {
+    return <main className="admin-shell"><section className="admin-content"><div className="admin-title"><span className="eyebrow">Заявка на доступ</span><h1>Тестовий користувач</h1></div><div className="review-layout"><section className="review-data"><dl><div><dt>Ім’я</dt><dd>Тестовий користувач</dd></div><div><dt>Email</dt><dd>candidate@example.com</dd></div><div><dt>Email підтверджено</dt><dd>Так</dd></div><div><dt>Спосіб реєстрації</dt><dd>Google</dd></div></dl></section><RegistrationDecisionResult status="approved" reviewer={{ name: "Другий адміністратор", email: "second.admin@example.com" }} decidedAt="28.07.2026, 15:30:00" comment="Доступ підтверджено після перевірки даних користувача та погодження рівня доступу." /></div></section></main>;
   }
   return <Workspace preview googleEnabled={google === "1"} user={role === "user" ? { name: "Демо Користувач", email: "user@example.com", role: "user", accessLevel: access === "edit" ? "edit" : "read" } : undefined} />;
 }

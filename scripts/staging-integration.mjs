@@ -20,7 +20,9 @@ const mailpitUrl = process.env.STAGING_E2E_MAILPIT_URL ?? "http://mailpit.railwa
 const mailpitHost = process.env.STAGING_E2E_SMTP_HOST ?? "mailpit.railway.internal";
 const password = `Gp-${randomBytes(15).toString("base64url")}!4`;
 const adminEmail = `gp-e2e-admin-${runId}@example.invalid`;
+const secondAdminEmail = `gp-e2e-admin-2-${runId}@example.invalid`;
 const userEmail = `gp-e2e-user-${runId}@example.invalid`;
+const testEmails = [adminEmail, secondAdminEmail, userEmail];
 const plotId = `gp-e2e-plot-${runId}`;
 const categoryId = `gp-e2e-category-${runId}`;
 const categoryDescription = `Category description ${runId}`;
@@ -141,7 +143,7 @@ function startServer() {
     stdio: ["ignore", "pipe", "pipe"],
   });
   const capture = (chunk) => {
-    const line = chunk.toString().replaceAll(adminEmail, "[test-admin]").replaceAll(userEmail, "[test-user]").trim();
+    const line = chunk.toString().replaceAll(adminEmail, "[test-admin]").replaceAll(secondAdminEmail, "[test-admin-2]").replaceAll(userEmail, "[test-user]").trim();
     if (line) serverOutput.push(line.slice(0, 1000));
   };
   child.stdout.on("data", capture);
@@ -194,6 +196,23 @@ async function waitForMessage(email, predicate) {
     await delay(500);
   }
   throw new Error(`Timed out waiting for the expected Mailpit message for ${email.replace(/^[^@]+/, "[test]")}.`);
+}
+
+async function waitForMessageContaining(email, subject, expectedText) {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${mailpitUrl}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}&start=0&limit=50`);
+    assert(response.ok, `Mailpit search returned ${response.status}.`);
+    const body = await response.json();
+    for (const message of (body.messages ?? []).filter((item) => item.Subject === subject)) {
+      const content = await mailpitText(message.ID);
+      if (!content.includes(expectedText)) continue;
+      trackedMessageIds.add(message.ID);
+      return message;
+    }
+    await delay(500);
+  }
+  throw new Error(`Timed out waiting for matching Mailpit content for ${email.replace(/^[^@]+/, "[test]")}.`);
 }
 
 async function mailpitText(id) {
@@ -259,6 +278,27 @@ async function run() {
   const adminJar = await signIn(adminEmail);
   logStep("administrator signup, email verification and sign-in passed");
 
+  await signUp(secondAdminEmail, "Staging E2E Second Admin");
+  await verifyEmail(secondAdminEmail);
+  const secondApplicant = await databaseUser(secondAdminEmail);
+  const secondRegistration = await registrationFor(secondAdminEmail);
+  assert(secondApplicant?.approvalStatus === "pending" && secondRegistration?.status === "pending", "Second administrator applicant was not created.");
+  await waitForMessageContaining(adminEmail, "Нова заявка на доступ до GeoPartners", secondAdminEmail);
+  await request(`/api/admin/registrations/${secondRegistration.id}/decision`, {
+    method: "POST",
+    jar: adminJar,
+    json: { decision: "approved", comment: "Second staging administrator" },
+  });
+  await waitForMessage(secondAdminEmail, (item) => item.Subject === "Доступ до GeoPartners підтверджено");
+  await request(`/api/admin/users/${secondApplicant.id}`, {
+    method: "PATCH",
+    jar: adminJar,
+    json: { role: "admin", accessLevel: "edit", approvalStatus: "approved" },
+  });
+  const secondAdminJar = await signIn(secondAdminEmail);
+  assert((await databaseUser(secondAdminEmail))?.role === "admin", "Second administrator role was not persisted.");
+  logStep("second administrator provisioning passed");
+
   await signUp(userEmail, "Staging E2E User");
   await verifyEmail(userEmail);
   const applicant = await databaseUser(userEmail);
@@ -267,9 +307,12 @@ async function run() {
   assert(registration?.status === "pending", "Registration request was not created.");
   const userJar = await signIn(userEmail);
   await request("/api/plots", { jar: userJar, expected: [401] });
-  const adminNotice = await waitForMessage(adminEmail, (item) => item.Subject === "Нова заявка на доступ до GeoPartners");
-  assert((await mailpitText(adminNotice.ID)).includes("/admin/registrations/"), "Administrator notification does not contain the review link.");
-  logStep("applicant registration, verification, pending state and admin notification passed");
+  const [adminNotice, secondAdminNotice] = await Promise.all([
+    waitForMessageContaining(adminEmail, "Нова заявка на доступ до GeoPartners", userEmail),
+    waitForMessageContaining(secondAdminEmail, "Нова заявка на доступ до GeoPartners", userEmail),
+  ]);
+  assert((await mailpitText(adminNotice.ID)).includes("/admin/registrations/") && (await mailpitText(secondAdminNotice.ID)).includes("/admin/registrations/"), "Administrator notification does not contain the review link.");
+  logStep("applicant registration, verification, pending state and multi-admin notifications passed");
 
   await request(`/api/admin/users/${applicant.id}`, {
     method: "PATCH",
@@ -290,17 +333,30 @@ async function run() {
   });
   logStep("pending applicant access configuration and guarded decision flow passed");
 
-  await request(`/api/admin/registrations/${registration.id}/decision`, {
-    method: "POST",
-    jar: adminJar,
-    expected: [200],
-    json: { decision: "approved", comment: reviewComment },
-  });
+  const decisionAttempts = await Promise.all([
+    request(`/api/admin/registrations/${registration.id}/decision`, {
+      method: "POST",
+      jar: adminJar,
+      expected: [200, 409],
+      json: { decision: "approved", comment: reviewComment },
+    }),
+    request(`/api/admin/registrations/${registration.id}/decision`, {
+      method: "POST",
+      jar: secondAdminJar,
+      expected: [200, 409],
+      json: { decision: "approved", comment: reviewComment },
+    }),
+  ]);
+  assert(decisionAttempts.map(({ response }) => response.status).sort().join(",") === "200,409", "Concurrent administrator decisions were not resolved atomically.");
   const approved = await databaseUser(userEmail);
   assert(approved?.approvalStatus === "approved", "Administrator approval was not persisted.");
+  const decidedRequest = await client.query("select status, decided_by as \"decidedBy\", comment from registration_request where id = $1", [registration.id]);
+  assert(decidedRequest.rows[0]?.status === "approved" && [admin.id, secondApplicant.id].includes(decidedRequest.rows[0]?.decidedBy), "Registration decision author was not persisted.");
+  const processedPage = await request(`/admin/registrations/${registration.id}`, { jar: secondAdminJar });
+  assert(typeof processedPage.payload === "string" && processedPage.payload.includes("Результат розгляду") && processedPage.payload.includes(reviewComment), "Processed registration result page is incomplete.");
   const decisionNotice = await waitForMessage(userEmail, (item) => item.Subject === "Доступ до GeoPartners підтверджено");
   assert((await mailpitText(decisionNotice.ID)).includes(reviewComment), "Approval email does not include the administrator comment.");
-  logStep("administrator approval and decision email passed");
+  logStep("atomic administrator approval, recorded reviewer, result page and decision email passed");
 
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
   await request("/api/workspace", { method: "POST", jar: userJar, json: { workspace: "sandbox" } });
@@ -386,7 +442,7 @@ async function cleanup() {
   if (databaseConnected) {
     await client.query("begin");
     try {
-      const users = await client.query(`select id from "user" where email = any($1::text[])`, [[adminEmail, userEmail]]);
+      const users = await client.query(`select id from "user" where email = any($1::text[])`, [testEmails]);
       const userIds = users.rows.map((row) => row.id);
       await client.query(
         `delete from plot_version
@@ -402,18 +458,18 @@ async function cleanup() {
         `delete from notification_outbox
           where recipient = any($1::text[])
              or payload::text like $2`,
-        [[adminEmail, userEmail], `%${runId}%`],
+        [testEmails, `%${runId}%`],
       );
       await client.query(`delete from verification where identifier like $1`, [`%${runId}%`]);
       await client.query("delete from category where id = $1", [categoryId]);
-      await client.query(`delete from "user" where email = any($1::text[])`, [[adminEmail, userEmail]]);
+      await client.query(`delete from "user" where email = any($1::text[])`, [testEmails]);
       await client.query("commit");
       const residue = await client.query(
         `select
            (select count(*) from "user" where email = any($1::text[]))::int as users,
            (select count(*) from plot where id = $2)::int as plots,
            (select count(*) from audit_log where entity_id = $2)::int as audits`,
-        [[adminEmail, userEmail], plotId],
+        [testEmails, plotId],
       );
       assert(Object.values(residue.rows[0]).every((value) => value === 0), `Database cleanup left residue: ${JSON.stringify(residue.rows[0])}`);
       logStep("temporary database records were removed");

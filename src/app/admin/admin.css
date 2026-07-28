@@ -208,7 +208,8 @@
 }
 
 .review-data,
-.decision-form {
+.decision-form,
+.decision-result {
   background: var(--surface);
   border: 1px solid var(--line);
   padding: 20px;
@@ -295,6 +296,58 @@
 .admin-error {
   color: var(--red);
   font-size: 12px;
+}
+
+.decision-result > header {
+  align-items: center;
+  color: var(--green-dark);
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.decision-result[data-status="rejected"] > header,
+.decision-result[data-status="suspended"] > header {
+  color: var(--red);
+}
+
+.decision-result > header span,
+.decision-result > header strong {
+  display: block;
+}
+
+.decision-result > header span {
+  color: var(--muted);
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.decision-result dl {
+  margin: 0;
+}
+
+.decision-result dl div {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.decision-result dt {
+  color: var(--muted);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.decision-result dd {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.decision-result dd small {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
 }
 
 @media (max-width: 760px) {
