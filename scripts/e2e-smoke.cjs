@@ -16,6 +16,25 @@ const appOrigin = new URL(baseUrl).origin;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
 
+  await page.goto(`${baseUrl}?view=users`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert(await page.getByRole("combobox", { name: "Роль tester@example.com" }).isEnabled(), "pending applicant role is editable");
+  assert(await page.getByRole("combobox", { name: "Рівень доступу tester@example.com" }).isEnabled(), "pending applicant access is editable");
+  assert(await page.getByRole("combobox", { name: "Статус tester@example.com" }).isDisabled(), "pending applicant decision stays protected");
+  assert(await page.getByRole("button", { name: "Зберегти tester@example.com" }).isEnabled(), "pending applicant settings can be saved");
+  assert((await page.getByRole("link", { name: "Розглянути заявку tester@example.com" }).count()) === 1, "pending applicant exposes the review action");
+  assert(await page.getByRole("combobox", { name: "Роль admin@example.com" }).isDisabled(), "protected administrator remains locked");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-user-management.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile user management has no horizontal overflow");
+  assert((await page.locator(".user-actions").first().getByRole("button").count()) === 1, "mobile pending applicant keeps save action");
+  assert((await page.locator(".user-actions").first().getByRole("link").count()) === 1, "mobile pending applicant keeps review action");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-user-management.png") });
+  console.log("stage=user-management");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.removeItem("geopartners-preview"));
   await page.reload({ waitUntil: "domcontentloaded" });

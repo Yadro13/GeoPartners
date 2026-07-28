@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { user } from "@/db/schema";
+import { registrationRequest, user } from "@/db/schema";
 import { requireAdmin } from "@/lib/access";
 import { UserManagementTable } from "@/components/admin/UserManagementTable";
 import "../admin.css";
 
 export default async function AdminUsersPage() {
   const admin = await requireAdmin("/admin/users");
-  const users = await db.select().from(user).orderBy(desc(user.createdAt));
+  const users = await db
+    .select({ account: user, registrationRequestId: registrationRequest.id })
+    .from(user)
+    .leftJoin(registrationRequest, eq(registrationRequest.userId, user.id))
+    .orderBy(desc(user.createdAt));
   const protectedEmail = process.env.ADMIN_EMAIL?.toLocaleLowerCase();
-  return <main className="admin-shell"><header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><Link href="/"><ArrowLeft size={16} />До карти</Link></header><section className="admin-content admin-content--wide"><div className="admin-title"><span className="eyebrow">Адміністрування</span><h1>Користувачі</h1></div><UserManagementTable initialUsers={users.map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role, accessLevel: item.role === "admin" ? "edit" : item.accessLevel, approvalStatus: item.approvalStatus, registrationMethod: item.registrationMethod, createdAt: item.createdAt.toISOString(), protected: item.id === admin.id || item.email.toLocaleLowerCase() === protectedEmail }))} /></section></main>;
+  return <main className="admin-shell"><header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><Link href="/"><ArrowLeft size={16} />До карти</Link></header><section className="admin-content admin-content--wide"><div className="admin-title"><span className="eyebrow">Адміністрування</span><h1>Користувачі</h1></div><UserManagementTable initialUsers={users.map(({ account, registrationRequestId }) => ({ id: account.id, name: account.name, email: account.email, role: account.role, accessLevel: account.role === "admin" ? "edit" : account.accessLevel, approvalStatus: account.approvalStatus, registrationMethod: account.registrationMethod, registrationRequestId, createdAt: account.createdAt.toISOString(), protected: account.id === admin.id || account.email.toLocaleLowerCase() === protectedEmail }))} /></section></main>;
 }

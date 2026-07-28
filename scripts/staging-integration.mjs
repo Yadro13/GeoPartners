@@ -269,6 +269,25 @@ async function run() {
   assert((await mailpitText(adminNotice.ID)).includes("/admin/registrations/"), "Administrator notification does not contain the review link.");
   logStep("applicant registration, verification, pending state and admin notification passed");
 
+  await request(`/api/admin/users/${applicant.id}`, {
+    method: "PATCH",
+    jar: adminJar,
+    json: { role: "user", accessLevel: "edit", approvalStatus: "pending" },
+  });
+  assert((await databaseUser(userEmail))?.accessLevel === "edit", "Administrator cannot preconfigure access for a pending applicant.");
+  await request(`/api/admin/users/${applicant.id}`, {
+    method: "PATCH",
+    jar: adminJar,
+    json: { role: "user", accessLevel: "read", approvalStatus: "pending" },
+  });
+  await request(`/api/admin/users/${applicant.id}`, {
+    method: "PATCH",
+    jar: adminJar,
+    expected: [409],
+    json: { role: "user", accessLevel: "edit", approvalStatus: "approved" },
+  });
+  logStep("pending applicant access configuration and guarded decision flow passed");
+
   await request(`/api/admin/registrations/${registration.id}/decision`, {
     method: "POST",
     jar: adminJar,
