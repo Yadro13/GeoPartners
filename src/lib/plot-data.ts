@@ -103,6 +103,7 @@ function normalizeCategories(value: unknown) {
     if (!isRecord(item)) return [];
     return [[id, {
       name: textValue(item.name) || id,
+      description: textValue(item.description).slice(0, 500),
       color: /^#[0-9a-f]{6}$/i.test(textValue(item.color)) ? textValue(item.color) : "#2f86a6",
       visible: item.visible !== false,
     } satisfies CategoryDefinition]];

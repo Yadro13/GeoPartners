@@ -231,7 +231,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     restoreAuditEntry,
     exportGeoJson, exportCsv, setBaseMap,
     toggleCategory: (id, visible) => { if (canManageCategories) updateCategory(id, { visible }); else setCategories((current) => ({ ...current, [id]: { ...current[id], visible } })); }, updateCategory,
-    addCategory: () => { const id = `category_${Date.now()}`; void persistCategories({ ...categories, [id]: { name: "Нова категорія", color: "#3979a8", visible: true } }); },
+    addCategory: () => { const id = `category_${Date.now()}`; void persistCategories({ ...categories, [id]: { name: "Нова категорія", description: "", color: "#3979a8", visible: true } }); },
     removeCategory: (id) => { if (id === "default" || !window.confirm(`Видалити категорію «${categories[id]?.name}»?`)) return; const next = { ...categories }; delete next[id]; void persistCategories(next).then((saved) => { if (saved) setPlots((current) => current.map((plot) => plot.properties.category === id ? { ...plot, properties: { ...plot.properties, category: "default" } } : plot)); }); },
     savePlotStatuses: persistPlotStatuses,
     setWorkspace, setTestWorkspaceEnabled, clearSandbox,

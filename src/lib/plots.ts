@@ -18,7 +18,7 @@ export function plotRowToFeature(row: PlotRow): PlotFeature {
 }
 
 export function categoryRowsToRecord(rows: CategoryRow[]): Record<string, CategoryDefinition> {
-  return Object.fromEntries(rows.map((row) => [row.id, { name: row.name, color: row.color, visible: row.visible }]));
+  return Object.fromEntries(rows.map((row) => [row.id, { name: row.name, description: row.description, color: row.color, visible: row.visible }]));
 }
 
 export function featureToPlotValues(feature: PlotFeature) {

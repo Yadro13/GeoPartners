@@ -123,6 +123,7 @@ export const category = pgTable(
     workspace: dataWorkspaceEnum("workspace").default("production").notNull(),
     id: text("id").notNull(),
     name: text("name").notNull(),
+    description: text("description").default("").notNull(),
     color: text("color").notNull(),
     visible: boolean("visible").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

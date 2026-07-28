@@ -24,7 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const neighboringRows = allRows.filter((row) => row.id !== id);
     const duplicate = neighboringRows.find((row) => row.cadastralNumber === feature.properties.cadastralNumber);
     if (duplicate) return NextResponse.json({ error: "Ділянка з таким кадастровим номером уже існує." }, { status: 409 });
-    const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
+    const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, description: "", color: "#2f86a6", visible: true };
     const before = plotRowToFeature(current); const changes = changedPlotFields(before, feature);
     const auditId = crypto.randomUUID();
     await db.transaction(async (tx) => {

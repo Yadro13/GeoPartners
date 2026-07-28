@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const existing = existingRows.find((row) => row.cadastralNumber === feature.properties.cadastralNumber);
     if (existing) return NextResponse.json({ error: "Ділянка з таким кадастровим номером уже існує." }, { status: 409 });
     const categoryId = feature.properties.category || "default";
-    const fallback = defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
+    const fallback = defaultCategories[categoryId] ?? { name: categoryId, description: "", color: "#2f86a6", visible: true };
     await db.transaction(async (tx) => {
       await tx.insert(category).values({ workspace, id: categoryId, ...fallback }).onConflictDoNothing({ target: [category.workspace, category.id] });
       await tx.insert(plot).values({ ...featureToPlotValues(feature), workspace });

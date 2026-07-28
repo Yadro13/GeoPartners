@@ -17,14 +17,14 @@ export type PlotProperties = {
   hasDocument?: boolean;
 };
 
-export type CategoryDefinition = { name: string; color: string; visible: boolean };
+export type CategoryDefinition = { name: string; description: string; color: string; visible: boolean };
 
 export const defaultCategories: Record<string, CategoryDefinition> = {
-  default: { name: "Без категорії", color: "#2f86a6", visible: true },
-  planned_wtg: { name: "Заплановано під ВЕУ", color: "#c67b18", visible: true },
-  wtg: { name: "ВЕУ", color: "#2a9461", visible: true },
-  alt_candidates: { name: "Альтернативний кандидат", color: "#8055a6", visible: true },
-  roads: { name: "Дороги", color: "#66756d", visible: true },
+  default: { name: "Без категорії", description: "", color: "#2f86a6", visible: true },
+  planned_wtg: { name: "Заплановано під ВЕУ", description: "", color: "#c67b18", visible: true },
+  wtg: { name: "ВЕУ", description: "", color: "#2a9461", visible: true },
+  alt_candidates: { name: "Альтернативний кандидат", description: "", color: "#8055a6", visible: true },
+  roads: { name: "Дороги", description: "", color: "#66756d", visible: true },
 };
 
 export const categoryMeta = defaultCategories;

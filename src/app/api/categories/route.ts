@@ -13,11 +13,15 @@ export async function PUT(request: Request) {
   if (!hasPermission(currentUser, "categories.manage")) return NextResponse.json({ error: "Недостатньо прав для керування категоріями." }, { status: 403 });
   const workspace = await getDataWorkspace();
   const value = await request.json() as Record<string, CategoryDefinition>;
-  const entries = Object.entries(value).filter(([id, item]) => id && item?.name && /^#[0-9a-f]{6}$/i.test(item.color));
+  const entries = Object.entries(value).flatMap(([id, item]) => {
+    const name = item?.name?.trim();
+    if (!id || !name || !/^#[0-9a-f]{6}$/i.test(item.color)) return [];
+    return [[id, { ...item, name: name.slice(0, 120), description: typeof item.description === "string" ? item.description.trim().slice(0, 500) : "" }] as const];
+  });
   if (!entries.some(([id]) => id === "default")) return NextResponse.json({ error: "Категорія default обов'язкова." }, { status: 400 });
   const ids = entries.map(([id]) => id);
   await db.transaction(async (tx) => {
-    for (const [id, item] of entries) await tx.insert(category).values({ workspace, id, name: item.name, color: item.color, visible: item.visible }).onConflictDoUpdate({ target: [category.workspace, category.id], set: { name: item.name, color: item.color, visible: item.visible } });
+    for (const [id, item] of entries) await tx.insert(category).values({ workspace, id, name: item.name, description: item.description, color: item.color, visible: item.visible }).onConflictDoUpdate({ target: [category.workspace, category.id], set: { name: item.name, description: item.description, color: item.color, visible: item.visible } });
     await tx.update(plot).set({ categoryId: "default" }).where(and(eq(plot.workspace, workspace), notInArray(plot.categoryId, ids)));
     await tx.delete(category).where(and(eq(category.workspace, workspace), notInArray(category.id, ids)));
   });

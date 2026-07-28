@@ -22,6 +22,8 @@ const password = `Gp-${randomBytes(15).toString("base64url")}!4`;
 const adminEmail = `gp-e2e-admin-${runId}@example.invalid`;
 const userEmail = `gp-e2e-user-${runId}@example.invalid`;
 const plotId = `gp-e2e-plot-${runId}`;
+const categoryId = `gp-e2e-category-${runId}`;
+const categoryDescription = `Category description ${runId}`;
 const statusId = `gp-e2e-status-${runId}`;
 const statusName = `Тестовий статус ${runId}`;
 const cadastralNumber = `E2E:${runId}`;
@@ -332,6 +334,16 @@ async function run() {
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: statusCatalog.payload });
   const clearedPlot = await request("/api/plots", { jar: userJar });
   assert(clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === "", "Deleted status was not cleared from the plot.");
+  const categoryRows = await client.query("select id, name, description, color, visible from category where workspace = 'sandbox' order by id");
+  const categoryCatalog = Object.fromEntries(categoryRows.rows.map((item) => [item.id, { name: item.name, description: item.description, color: item.color, visible: item.visible }]));
+  await request("/api/categories", {
+    method: "PUT",
+    jar: adminJar,
+    json: { ...categoryCatalog, [categoryId]: { name: "E2E category", description: `  ${categoryDescription}  `, color: "#3979a8", visible: true } },
+  });
+  const savedCategory = await client.query("select description from category where workspace = 'sandbox' and id = $1", [categoryId]);
+  assert(savedCategory.rows[0]?.description === categoryDescription, "Category description was not normalized and persisted.");
+  await request("/api/categories", { method: "PUT", jar: adminJar, json: categoryCatalog });
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Updated by E2E user") });
   const audit = await request(`/api/audit?q=${encodeURIComponent(cadastralNumber)}&scope=plots&limit=30`, { jar: userJar });
   const updatedAudit = audit.payload.items?.filter((item) => item.action === "plot.updated" && item.entityId === plotId).at(-1);
@@ -393,6 +405,7 @@ async function cleanup() {
         [[adminEmail, userEmail], `%${runId}%`],
       );
       await client.query(`delete from verification where identifier like $1`, [`%${runId}%`]);
+      await client.query("delete from category where id = $1", [categoryId]);
       await client.query(`delete from "user" where email = any($1::text[])`, [[adminEmail, userEmail]]);
       await client.query("commit");
       const residue = await client.query(

@@ -1,0 +1,1 @@
+ALTER TABLE "category" ADD COLUMN "description" text DEFAULT '' NOT NULL;

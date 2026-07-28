@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         if (batchCadastrals.has(cadastral)) throw new Error(`${feature.properties.cadastralNumber}: кадастровий номер повторюється у пакеті.`);
         batchCadastrals.add(cadastral);
         const existing = existingByCadastral.get(cadastral); if (existing) feature.properties.id = existing.id;
-        const categoryId = feature.properties.category || "default"; const categoryDefinition = importedCategories[categoryId] ?? defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
+        const categoryId = feature.properties.category || "default"; const categoryDefinition = importedCategories[categoryId] ?? defaultCategories[categoryId] ?? { name: categoryId, description: "", color: "#2f86a6", visible: true };
         importedCategories[categoryId] = categoryDefinition;
         prepared.push({ feature, document, existing, category: categoryDefinition, pdfObjectKey: existing?.pdfObjectKey ?? null });
       }

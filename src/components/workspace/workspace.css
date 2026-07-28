@@ -788,14 +788,33 @@
   gap: 8px;
 }
 
+.category-settings__header {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 22px 34px minmax(180px, 0.75fr) minmax(260px, 1.25fr) 38px;
+}
+
+.category-settings__header h2 {
+  grid-column: 1 / 4;
+}
+
+.category-settings__header > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  grid-column: 4;
+  padding: 0 8px 8px;
+}
+
 .category-setting {
   align-items: center;
   border-bottom: 1px solid #e8ece9;
   display: grid;
   gap: 10px;
-  grid-template-columns: 22px 34px minmax(180px, 1fr) 38px;
-  min-height: 54px;
-  padding: 5px 0;
+  grid-template-columns: 22px 34px minmax(180px, 0.75fr) minmax(260px, 1.25fr) 38px;
+  min-height: 66px;
+  padding: 7px 0;
 }
 
 .category-setting input:disabled,
@@ -824,7 +843,30 @@
   padding: 0 8px;
 }
 
-.category-setting input:focus {
+.category-setting textarea {
+  background: transparent;
+  border: 1px solid var(--line);
+  line-height: 1.45;
+  min-height: 48px;
+  padding: 7px 8px;
+  resize: vertical;
+}
+
+.category-setting__description {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 7px 8px;
+}
+
+.category-setting__description[data-empty="true"] {
+  color: var(--muted);
+}
+
+.category-setting input:focus,
+.category-setting textarea:focus {
   background: white;
   border-color: var(--line);
   outline: 2px solid rgba(42, 148, 97, 0.18);
@@ -2006,6 +2048,28 @@
     align-items: flex-start;
     margin-bottom: 16px;
     padding-bottom: 12px;
+  }
+
+  .category-settings__header {
+    display: block;
+  }
+
+  .category-settings__header > span {
+    display: none;
+  }
+
+  .category-setting {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    gap: 8px;
+    grid-template-columns: 22px 34px minmax(0, 1fr) 38px;
+    margin-bottom: 8px;
+    padding: 10px;
+  }
+
+  .category-setting textarea,
+  .category-setting__description {
+    grid-column: 1 / -1;
   }
 
   .workspace-page__header h1 {

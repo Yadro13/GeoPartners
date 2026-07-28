@@ -13,13 +13,32 @@ import type { DataWorkspace } from "@/lib/data-workspace";
 export function LayersPanel({ categories, baseMap, actions, canManage }: { categories: Record<string, CategoryDefinition>; baseMap: BaseMapId; actions: WorkspaceActions; canManage: boolean }) {
   return <section className="workspace-page"><header className="workspace-page__header"><div><span className="eyebrow">Відображення карти</span><h1>Шари</h1></div>{canManage ? <button className="command-button" type="button" onClick={actions.addCategory}><Plus size={17} />Категорія</button> : <span className="role-badge">Категорії захищено</span>}</header>
     <div className="settings-section"><h2>Підкладка</h2><div className="segmented-control" role="group" aria-label="Підкладка карти">{([['streets','Схема'],['light','Світла'],['satellite','Супутник']] as const).map(([id,label]) => <button key={id} data-active={baseMap === id} type="button" onClick={() => actions.setBaseMap(id)}>{label}</button>)}</div></div>
-    <div className="settings-section"><h2>Категорії ділянок</h2><div className="category-settings">{Object.entries(categories).map(([id, category]) => <div className="category-setting" key={id}>
-      <input aria-label={`Показувати ${category.name}`} type="checkbox" checked={category.visible} onChange={(event) => actions.toggleCategory(id, event.target.checked)} />
-      <input aria-label={`Колір ${category.name}`} type="color" value={category.color} disabled={!canManage} onChange={(event) => actions.updateCategory(id, { color: event.target.value })} />
-      <input aria-label="Назва категорії" value={category.name} disabled={!canManage || id === "default"} onChange={(event) => actions.updateCategory(id, { name: event.target.value })} />
-      <button className="icon-button" disabled={!canManage || id === "default"} type="button" onClick={() => actions.removeCategory(id)} aria-label={`Видалити ${category.name}`}><Trash2 size={17} /></button>
-    </div>)}</div></div>
+    <div className="settings-section"><div className="category-settings__header"><h2>Категорії ділянок</h2><span>Опис</span></div><div className="category-settings">{Object.entries(categories).map(([id, category]) => <CategorySetting id={id} category={category} actions={actions} canManage={canManage} key={id} />)}</div></div>
   </section>;
+}
+
+function CategorySetting({ id, category, actions, canManage }: { id: string; category: CategoryDefinition; actions: WorkspaceActions; canManage: boolean }) {
+  const [name, setName] = useState(category.name);
+  const [description, setDescription] = useState(category.description);
+
+  const saveName = () => {
+    const normalized = name.trim();
+    if (!normalized) return setName(category.name);
+    if (normalized !== category.name) actions.updateCategory(id, { name: normalized, description: description.trim() });
+  };
+  const saveDescription = () => {
+    const normalized = description.trim();
+    setDescription(normalized);
+    if (normalized !== category.description) actions.updateCategory(id, { name: name.trim() || category.name, description: normalized });
+  };
+
+  return <div className="category-setting">
+    <input aria-label={`Показувати ${category.name}`} type="checkbox" checked={category.visible} onChange={(event) => actions.toggleCategory(id, event.target.checked)} />
+    <input aria-label={`Колір ${category.name}`} type="color" value={category.color} disabled={!canManage} onChange={(event) => actions.updateCategory(id, { color: event.target.value })} />
+    <input aria-label={`Назва категорії ${category.name}`} value={name} disabled={!canManage || id === "default"} maxLength={120} onBlur={saveName} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+    {canManage ? <textarea aria-label={`Опис категорії ${category.name}`} value={description} maxLength={500} rows={2} placeholder="Додайте короткий опис" onBlur={saveDescription} onChange={(event) => setDescription(event.target.value)} /> : <p className="category-setting__description" data-empty={!category.description}>{category.description || "Опис не додано"}</p>}
+    <button className="icon-button" disabled={!canManage || id === "default"} type="button" onClick={() => actions.removeCategory(id)} aria-label={`Видалити ${category.name}`}><Trash2 size={17} /></button>
+  </div>;
 }
 
 export function ReportsPanel({ plots, categories, actions }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; actions: WorkspaceActions }) {

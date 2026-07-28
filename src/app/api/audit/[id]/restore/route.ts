@@ -28,7 +28,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const rows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const current = rows.find((row) => row.id === feature.properties.id);
     const duplicate = rows.find((row) => row.id !== feature.properties.id && row.cadastralNumber === feature.properties.cadastralNumber);
     if (duplicate) return NextResponse.json({ error: "Відновлення створить дубль кадастрового номера." }, { status: 409 });
-    const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, color: "#2f86a6", visible: true };
+    const categoryId = feature.properties.category || "default"; const fallback = defaultCategories[categoryId] ?? { name: categoryId, description: "", color: "#2f86a6", visible: true };
     const currentFeature = current ? plotRowToFeature(current) : null; const changes = changedPlotFields(currentFeature, feature); const restoreAuditId = crypto.randomUUID();
     await db.transaction(async (tx) => {
       await tx.insert(category).values({ workspace, id: categoryId, ...fallback }).onConflictDoNothing({ target: [category.workspace, category.id] });
