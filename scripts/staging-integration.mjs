@@ -22,6 +22,8 @@ const password = `Gp-${randomBytes(15).toString("base64url")}!4`;
 const adminEmail = `gp-e2e-admin-${runId}@example.invalid`;
 const userEmail = `gp-e2e-user-${runId}@example.invalid`;
 const plotId = `gp-e2e-plot-${runId}`;
+const statusId = `gp-e2e-status-${runId}`;
+const statusName = `Тестовий статус ${runId}`;
 const cadastralNumber = `E2E:${runId}`;
 const reviewComment = `Automated staging check ${runId}`;
 const trackedMessageIds = new Set();
@@ -218,7 +220,7 @@ async function registrationFor(email) {
   return result.rows[0] ?? null;
 }
 
-function testPlot(name = "Staging E2E plot") {
+function testPlot(name = "Staging E2E plot", status = "обрана ділянка як варіант") {
   return {
     type: "Feature",
     geometry: {
@@ -235,7 +237,7 @@ function testPlot(name = "Staging E2E plot") {
       mainCandidateCadastral: "",
       owner: "E2E",
       lessee: "",
-      status: "test",
+      status,
       sourceFilename: `staging-e2e-${runId}`,
     },
   };
@@ -299,6 +301,18 @@ async function run() {
   });
   const editor = await databaseUser(userEmail);
   assert(editor?.accessLevel === "edit", "Administrator did not grant plot editing access.");
+  const statusCatalog = await request("/api/plot-statuses", { jar: userJar });
+  assert(statusCatalog.payload[0]?.name === "обрана ділянка як варіант", "Initial plot status order is invalid.");
+  await request("/api/plot-statuses", { method: "PUT", jar: userJar, expected: [403], json: statusCatalog.payload });
+  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: statusName }] });
+  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Status assigned by E2E editor", statusName) });
+  const renamedStatus = `${statusName} renamed`;
+  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: renamedStatus }] });
+  const renamedPlot = await request("/api/plots", { jar: userJar });
+  assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === renamedStatus, "Status rename was not propagated to the plot.");
+  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: statusCatalog.payload });
+  const clearedPlot = await request("/api/plots", { jar: userJar });
+  assert(clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === "", "Deleted status was not cleared from the plot.");
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Updated by E2E user") });
   const audit = await request(`/api/audit?q=${encodeURIComponent(cadastralNumber)}&scope=plots&limit=30`, { jar: userJar });
   const updatedAudit = audit.payload.items?.find((item) => item.action === "plot.updated" && item.entityId === plotId);
@@ -352,6 +366,7 @@ async function cleanup() {
       );
       await client.query(`delete from audit_log where entity_id = $1 or actor_user_id = any($2::text[])`, [plotId, userIds]);
       await client.query(`delete from plot where workspace = 'sandbox' and id = $1`, [plotId]);
+      await client.query(`delete from plot_status where workspace = 'sandbox' and id = $1`, [statusId]);
       await client.query(
         `delete from notification_outbox
           where recipient = any($1::text[])

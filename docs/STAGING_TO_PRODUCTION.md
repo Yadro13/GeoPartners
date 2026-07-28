@@ -8,7 +8,7 @@
 
 ## Що переносимо
 
-- PostgreSQL: користувачі, реєстрації, налаштування, робоча й тестова області, категорії, ділянки, аудит, версії та notification outbox.
+- PostgreSQL: користувачі, реєстрації, налаштування, робоча й тестова області, категорії, довідники статусів, ділянки, аудит, версії та notification outbox.
 - Railway Bucket: PDF ділянок і архіви БД, якщо для production не створено окрему політику архівів.
 - Конфігурацію застосунку не копіюємо як дані. Railway variables, домен, OAuth callback, SMTP і Telegram перевіряються окремо.
 
@@ -52,7 +52,7 @@
 6. Звірити контрольні показники:
    - кількість користувачів і заявок за статусами;
    - кількість ділянок у `production` і `sandbox`;
-   - кількість категорій, audit entries та plot versions;
+   - кількість категорій, статусів, audit entries та plot versions;
    - pending/failed/exhausted notification outbox;
    - кількість PDF та відсутність посилань на відсутні об'єкти.
 7. Підключити production web/worker/backup до нових PostgreSQL і Bucket.

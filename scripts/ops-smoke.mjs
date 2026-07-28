@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { coreTables } from "./backup-utils.mjs";
 import { createEmailSender, emailTransportMode } from "../src/lib/email-delivery.mjs";
 import { hasPermission } from "../src/lib/permissions.ts";
+import { defaultPlotStatuses } from "../src/data/plot-statuses.ts";
 import { structuredLog } from "./structured-log.mjs";
 
 let output = "";
@@ -40,6 +41,7 @@ for (const table of [
   "notification_outbox",
   "app_settings",
   "category",
+  "plot_status",
   "plot",
   "audit_log",
   "plot_version",
@@ -57,8 +59,27 @@ assert.equal(hasPermission({ role: "user", accessLevel: "read" }, "plots.create"
 assert.equal(hasPermission({ role: "user", accessLevel: "read" }, "plots.update"), false);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.create"), true);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.update"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "statuses.manage"), false);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.delete"), false);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "plots.delete"), true);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "statuses.manage"), true);
+assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
+  "обрана ділянка як варіант",
+  "проведено перемовини з власником",
+  "отримана згода власника",
+  "проведено перемовини з орендарем",
+  "отримано усну згоду орендаря",
+  "отримано письмову згоду орендаря",
+  "отримано схему поділу ділянки",
+  "на виправленні помилок в ДЗК",
+  "передано землевпоряднику на поділ",
+  "поділ ділянки на реєстрації",
+  "нові ділянки на реєстрації права власності",
+  "підписано угоду про розірвання оренди",
+  "угода про розірвання оренди на реєстрації",
+  "передано нотаріусу для угоди",
+  "ділянка під ВЕУ викуплена",
+]);
 
 const smtpMessages = [];
 const smtpSender = createEmailSender({
@@ -124,7 +145,7 @@ await assert.rejects(
   { code: "BREVO_CONFIG_MISSING" },
 );
 
-console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports", "access-levels"] }));
+console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports", "access-levels", "plot-statuses"] }));
 
 function testMessage() {
   return {

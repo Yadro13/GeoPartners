@@ -1,6 +1,7 @@
 import type { Feature, Polygon } from "geojson";
 import type { PlotProperties } from "@/data/demo";
 import type { CategoryDefinition } from "@/data/demo";
+import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import type { DataWorkspace } from "@/lib/data-workspace";
 
 export type PlotFeature = Feature<Polygon, PlotProperties>;
@@ -28,6 +29,7 @@ export type WorkspaceActions = {
   updateCategory: (id: string, changes: Partial<CategoryDefinition>) => void;
   addCategory: () => void;
   removeCategory: (id: string) => void;
+  savePlotStatuses: (statuses: PlotStatusDefinition[]) => Promise<PlotStatusDefinition[] | null>;
   setWorkspace: (workspace: DataWorkspace) => Promise<void>;
   setTestWorkspaceEnabled: (enabled: boolean) => Promise<void>;
   clearSandbox: () => Promise<void>;
@@ -39,6 +41,7 @@ export type WorkspaceViewProps = {
   selectedId: string | null;
   query: string;
   categories: Record<string, CategoryDefinition>;
+  plotStatuses: PlotStatusDefinition[];
   activeSection: WorkspaceSection;
   baseMap: BaseMapId;
   user: WorkspaceUser;

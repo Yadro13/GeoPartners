@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, foreignKey, index, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const userAccessLevelEnum = pgEnum("user_access_level", ["read", "edit"]);
@@ -129,6 +129,23 @@ export const category = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   (table) => [primaryKey({ name: "category_workspace_id_pk", columns: [table.workspace, table.id] })],
+);
+
+export const plotStatus = pgTable(
+  "plot_status",
+  {
+    workspace: dataWorkspaceEnum("workspace").default("production").notNull(),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "plot_status_workspace_id_pk", columns: [table.workspace, table.id] }),
+    uniqueIndex("plot_status_workspace_name_idx").on(table.workspace, table.name),
+    uniqueIndex("plot_status_workspace_sort_idx").on(table.workspace, table.sortOrder),
+  ],
 );
 
 export const plot = pgTable(

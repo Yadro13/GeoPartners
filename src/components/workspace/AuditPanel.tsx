@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, FileInput, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileInput, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Settings2, Trash2 } from "lucide-react";
 import { demoPlots } from "@/data/demo";
 import type { AuditAction, AuditEntry, VersionComparison } from "@/lib/audit";
 import type { BaseMapId } from "./types";
@@ -54,8 +54,8 @@ function AuditRow({ entry, canRestore, loading, onCompare }: { entry: AuditEntry
   return <details className="audit-row"><summary><span className="audit-row__icon" data-action={entry.action}>{actionIcon(entry.action)}</span><span className="audit-row__main"><strong>{entry.summary}</strong><small>{entry.actorName} · {entry.actorEmail}</small></span><time dateTime={String(entry.createdAt)}>{formatDate(entry.createdAt)}</time></summary><div className="audit-row__details"><span><b>Подія</b>{actionLabel(entry.action)}</span>{entry.cadastralNumber ? <span><b>Кадастровий номер</b>{entry.cadastralNumber}</span> : null}{changes.length ? <span><b>Змінені дані</b>{changes.join(", ")}</span> : null}{files.length ? <span><b>Файли пакета</b>{files.join(", ")}</span> : null}{entry.canRestore && canRestore ? <button className="command-button audit-restore" type="button" disabled={loading} onClick={onCompare}><RotateCcw size={16} />{loading ? "Підготовка…" : "Порівняти та відновити"}</button> : null}</div></details>;
 }
 
-function actionIcon(action: AuditAction) { if (action === "plot.created") return <Plus size={18} />; if (action === "plot.updated") return <Pencil size={17} />; if (action === "plot.deleted") return <Trash2 size={17} />; if (action === "plot.restored") return <RotateCcw size={17} />; return <FileInput size={18} />; }
-function actionLabel(action: AuditAction) { return ({ "plot.created": "Створення ділянки", "plot.updated": "Редагування ділянки", "plot.deleted": "Видалення ділянки", "plot.restored": "Відновлення версії", "import.completed": "Імпорт пакета" })[action]; }
+function actionIcon(action: AuditAction) { if (action === "plot.created") return <Plus size={18} />; if (action === "plot.updated") return <Pencil size={17} />; if (action === "plot.deleted") return <Trash2 size={17} />; if (action === "plot.restored") return <RotateCcw size={17} />; if (action === "plot-statuses.updated") return <Settings2 size={17} />; return <FileInput size={18} />; }
+function actionLabel(action: AuditAction) { return ({ "plot.created": "Створення ділянки", "plot.updated": "Редагування ділянки", "plot.deleted": "Видалення ділянки", "plot.restored": "Відновлення версії", "import.completed": "Імпорт пакета", "plot-statuses.updated": "Довідник статусів" })[action]; }
 function formatDate(value: string | Date) { return new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 
 function demoComparison(entry: AuditEntry): VersionComparison {

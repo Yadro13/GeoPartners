@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { CircleCheck, Download, Eye, EyeOff, FileJson, FileSpreadsheet, FileText, KeyRound, Link2, LogOut, Plus, Printer, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleCheck, Download, Eye, EyeOff, FileJson, FileSpreadsheet, FileText, KeyRound, Link2, LogOut, Plus, Printer, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { CategoryDefinition } from "@/data/demo";
+import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { exportReportDocx, exportReportPdf, printReport, summarizePlots } from "@/lib/report-export";
 import type { BaseMapId, PlotFeature, WorkspaceActions, WorkspaceUser } from "./types";
 import type { DataWorkspace } from "@/lib/data-workspace";
@@ -54,7 +55,7 @@ function passwordErrorMessage(error: { code?: string; message?: string }) {
   return error.message || "Не вдалося змінити пароль. Спробуйте ще раз.";
 }
 
-export function ProfilePanel({ user, googleEnabled, preview, workspace, testWorkspaceEnabled, actions }: { user: WorkspaceUser; googleEnabled: boolean; preview: boolean; workspace: DataWorkspace; testWorkspaceEnabled: boolean; actions: WorkspaceActions }) {
+export function ProfilePanel({ user, googleEnabled, preview, workspace, testWorkspaceEnabled, plotStatuses, actions }: { user: WorkspaceUser; googleEnabled: boolean; preview: boolean; workspace: DataWorkspace; testWorkspaceEnabled: boolean; plotStatuses: PlotStatusDefinition[]; actions: WorkspaceActions }) {
   const [message, setMessage] = useState<ProfileMessage>(null);
   const [busy, setBusy] = useState<"name" | "password" | "google" | null>(null);
   const [providers, setProviders] = useState<string[]>(preview ? ["credential"] : []);
@@ -111,12 +112,39 @@ export function ProfilePanel({ user, googleEnabled, preview, workspace, testWork
   const googleLinked = providers.includes("google");
   const passwordAvailable = preview || providers.includes("credential");
   return <section className="workspace-page"><header className="workspace-page__header"><div><span className="eyebrow">Обліковий запис</span><h1>Профіль</h1></div><span className="role-badge">{user.role === "admin" ? "Адміністратор" : user.accessLevel === "edit" ? "Редагування" : "Тільки читання"}</span></header>
-    <div className="profile-layout"><section className="profile-summary"><span className="profile-avatar"><UserRound size={26} /></span><strong>{user.name}</strong><span>{user.email}</span>{user.role === "admin" ? <Link className="command-button" href="/admin/users">Користувачі</Link> : null}</section><div className="profile-forms"><form onSubmit={updateName}><h2>Ім’я в системі</h2><label>Ім’я<input name="name" defaultValue={user.name} required maxLength={100} /></label><button className="command-button" disabled={busy !== null} type="submit"><Save size={17} />Зберегти ім’я</button></form>{passwordAvailable ? <form onSubmit={changePassword}><h2>Змінити пароль</h2><PasswordField name="currentPassword" label="Поточний пароль" autoComplete="current-password" /><PasswordField name="newPassword" label="Новий пароль" autoComplete="new-password" /><PasswordField name="newPasswordConfirm" label="Повторіть новий пароль" autoComplete="new-password" /><button className="command-button" disabled={busy !== null} type="submit"><KeyRound size={17} />{busy === "password" ? "Збереження…" : "Змінити пароль"}</button></form> : accountsLoaded ? <section className="profile-connection"><div><span className="profile-connection__icon"><KeyRound size={19} /></span><span><strong>Пароль</strong><small>Вхід налаштовано через зовнішній обліковий запис</small></span></div></section> : null}{googleEnabled && user.role !== "admin" ? <section className="profile-connection"><div><span className="profile-connection__icon">{googleLinked ? <CircleCheck size={19} /> : <Link2 size={19} />}</span><span><strong>Google</strong><small>{googleLinked ? "Підключено" : "Не підключено"}</small></span></div>{googleLinked ? <span className="role-badge">Активно</span> : <button className="command-button" disabled={busy !== null || !accountsLoaded} type="button" onClick={connectGoogle}><Link2 size={17} />Підключити</button>}</section> : null}{user.role === "admin" ? <div className="profile-mobile-workspace-settings"><WorkspaceAdminSettings actions={actions} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} /></div> : null}{message ? <p className="form-message" data-kind={message.kind} role={message.kind === "error" ? "alert" : "status"}>{message.text}</p> : null}<button className="danger-button" type="button" onClick={signOut}><LogOut size={17} />Вийти з облікового запису</button></div></div>
+    <div className="profile-layout"><section className="profile-summary"><span className="profile-avatar"><UserRound size={26} /></span><strong>{user.name}</strong><span>{user.email}</span>{user.role === "admin" ? <Link className="command-button" href="/admin/users">Користувачі</Link> : null}</section><div className="profile-forms"><form onSubmit={updateName}><h2>Ім’я в системі</h2><label>Ім’я<input name="name" defaultValue={user.name} required maxLength={100} /></label><button className="command-button" disabled={busy !== null} type="submit"><Save size={17} />Зберегти ім’я</button></form>{passwordAvailable ? <form onSubmit={changePassword}><h2>Змінити пароль</h2><PasswordField name="currentPassword" label="Поточний пароль" autoComplete="current-password" /><PasswordField name="newPassword" label="Новий пароль" autoComplete="new-password" /><PasswordField name="newPasswordConfirm" label="Повторіть новий пароль" autoComplete="new-password" /><button className="command-button" disabled={busy !== null} type="submit"><KeyRound size={17} />{busy === "password" ? "Збереження…" : "Змінити пароль"}</button></form> : accountsLoaded ? <section className="profile-connection"><div><span className="profile-connection__icon"><KeyRound size={19} /></span><span><strong>Пароль</strong><small>Вхід налаштовано через зовнішній обліковий запис</small></span></div></section> : null}{googleEnabled && user.role !== "admin" ? <section className="profile-connection"><div><span className="profile-connection__icon">{googleLinked ? <CircleCheck size={19} /> : <Link2 size={19} />}</span><span><strong>Google</strong><small>{googleLinked ? "Підключено" : "Не підключено"}</small></span></div>{googleLinked ? <span className="role-badge">Активно</span> : <button className="command-button" disabled={busy !== null || !accountsLoaded} type="button" onClick={connectGoogle}><Link2 size={17} />Підключити</button>}</section> : null}{user.role === "admin" ? <div className="profile-mobile-workspace-settings"><PlotStatusSettings statuses={plotStatuses} actions={actions} /><WorkspaceAdminSettings actions={actions} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} /></div> : null}{message ? <p className="form-message" data-kind={message.kind} role={message.kind === "error" ? "alert" : "status"}>{message.text}</p> : null}<button className="danger-button" type="button" onClick={signOut}><LogOut size={17} />Вийти з облікового запису</button></div></div>
   </section>;
 }
 
-export function SettingsPanel({ actions, canImport, workspace, testWorkspaceEnabled, canManageWorkspaces }: { actions: WorkspaceActions; canImport: boolean; workspace: DataWorkspace; testWorkspaceEnabled: boolean; canManageWorkspaces: boolean }) {
-  return <section className="workspace-page"><header className="workspace-page__header"><div><span className="eyebrow">Обмін даними</span><h1>Налаштування</h1></div></header><div className="settings-actions">{canImport ? <button className="command-button command-button--primary" type="button" onClick={actions.openImport}><FileJson size={18} />Імпортувати дані</button> : null}<button className="command-button" type="button" onClick={actions.exportGeoJson}><Download size={18} />Експортувати GeoJSON</button><button className="command-button" type="button" onClick={actions.exportCsv}><FileSpreadsheet size={18} />Експортувати CSV</button></div>{canManageWorkspaces ? <WorkspaceAdminSettings actions={actions} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} /> : null}</section>;
+export function SettingsPanel({ actions, canImport, plotStatuses, workspace, testWorkspaceEnabled, canManageWorkspaces, canManageStatuses }: { actions: WorkspaceActions; canImport: boolean; plotStatuses: PlotStatusDefinition[]; workspace: DataWorkspace; testWorkspaceEnabled: boolean; canManageWorkspaces: boolean; canManageStatuses: boolean }) {
+  return <section className="workspace-page"><header className="workspace-page__header"><div><span className="eyebrow">Обмін даними</span><h1>Налаштування</h1></div></header><div className="settings-actions">{canImport ? <button className="command-button command-button--primary" type="button" onClick={actions.openImport}><FileJson size={18} />Імпортувати дані</button> : null}<button className="command-button" type="button" onClick={actions.exportGeoJson}><Download size={18} />Експортувати GeoJSON</button><button className="command-button" type="button" onClick={actions.exportCsv}><FileSpreadsheet size={18} />Експортувати CSV</button></div>{canManageStatuses ? <PlotStatusSettings statuses={plotStatuses} actions={actions} /> : null}{canManageWorkspaces ? <WorkspaceAdminSettings actions={actions} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} /> : null}</section>;
+}
+
+function PlotStatusSettings({ statuses, actions }: { statuses: PlotStatusDefinition[]; actions: WorkspaceActions }) {
+  const [draft, setDraft] = useState(statuses);
+  const [saving, setSaving] = useState(false);
+
+  const move = (index: number, offset: -1 | 1) => {
+    const destination = index + offset;
+    if (destination < 0 || destination >= draft.length) return;
+    const next = [...draft];
+    [next[index], next[destination]] = [next[destination], next[index]];
+    setDraft(next);
+  };
+  const save = async () => {
+    setSaving(true);
+    const saved = await actions.savePlotStatuses(draft);
+    if (saved) setDraft(saved);
+    setSaving(false);
+  };
+
+  return <section className="plot-status-settings"><header><div><span className="eyebrow">Довідник поточної бази</span><h2>Статуси ділянок</h2></div><button className="command-button" type="button" onClick={() => setDraft((current) => [...current, { id: `status_${crypto.randomUUID()}`, name: nextStatusName(current) }])}><Plus size={17} />Додати</button></header><div className="plot-status-list">{draft.map((item, index) => <div className="plot-status-row" key={item.id}><span className="plot-status-row__order">{index + 1}</span><textarea aria-label={`Назва статусу ${index + 1}`} value={item.name} maxLength={160} rows={2} onChange={(event) => setDraft((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, name: event.target.value } : candidate))} /><button className="icon-button" type="button" disabled={index === 0} onClick={() => move(index, -1)} title="Перемістити вище" aria-label={`Перемістити статус ${item.name} вище`}><ArrowUp size={17} /></button><button className="icon-button" type="button" disabled={index === draft.length - 1} onClick={() => move(index, 1)} title="Перемістити нижче" aria-label={`Перемістити статус ${item.name} нижче`}><ArrowDown size={17} /></button><button className="icon-button" type="button" onClick={() => setDraft((current) => current.filter(({ id }) => id !== item.id))} title="Видалити статус" aria-label={`Видалити статус ${item.name}`}><Trash2 size={17} /></button></div>)}</div><footer><small>Порядок тут визначає порядок у списку вибору статусу.</small><button className="command-button command-button--primary" disabled={saving} type="button" onClick={() => void save()}><Save size={17} />{saving ? "Збереження…" : "Зберегти довідник"}</button></footer></section>;
+}
+
+function nextStatusName(statuses: PlotStatusDefinition[]) {
+  let suffix = statuses.length + 1;
+  while (statuses.some(({ name }) => name === `Новий статус ${suffix}`)) suffix += 1;
+  return `Новий статус ${suffix}`;
 }
 
 function WorkspaceAdminSettings({ actions, workspace, testWorkspaceEnabled }: { actions: WorkspaceActions; workspace: DataWorkspace; testWorkspaceEnabled: boolean }) {

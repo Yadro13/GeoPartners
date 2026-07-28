@@ -13,6 +13,7 @@ export const coreTables = [
   "notification_outbox",
   "app_settings",
   "category",
+  "plot_status",
   "plot",
   "audit_log",
   "plot_version",

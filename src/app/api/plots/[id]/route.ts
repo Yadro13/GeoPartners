@@ -8,6 +8,7 @@ import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/p
 import { auditValues, changedPlotFields, versionSnapshot } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
+import { assertKnownPlotStatus } from "@/lib/plot-status-directory";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const currentUser = await getCurrentUser();
@@ -19,6 +20,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (feature.properties.id !== id) return NextResponse.json({ error: "ID ділянки не збігається." }, { status: 400 });
     const allRows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const current = allRows.find((row) => row.id === id);
     if (!current) return NextResponse.json({ error: "Ділянку не знайдено." }, { status: 404 });
+    if (feature.properties.status !== current.status) await assertKnownPlotStatus(workspace, feature.properties.status ?? "");
     const neighboringRows = allRows.filter((row) => row.id !== id);
     const duplicate = neighboringRows.find((row) => row.cadastralNumber === feature.properties.cadastralNumber);
     if (duplicate) return NextResponse.json({ error: "Ділянка з таким кадастровим номером уже існує." }, { status: 409 });

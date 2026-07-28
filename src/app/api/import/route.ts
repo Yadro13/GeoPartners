@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLog, category, plot, plotVersion } from "@/db/schema";
+import { auditLog, category, plot, plotStatus, plotVersion } from "@/db/schema";
 import { defaultCategories, type CategoryDefinition } from "@/data/demo";
 import type { PlotFeature } from "@/components/workspace/types";
 import { getCurrentUser } from "@/lib/access";
@@ -35,8 +35,9 @@ export async function POST(request: Request) {
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
     serverLog("info", "import.started", { workspace, fileCount: files.length, geoJsonCount: geoFiles.length, pdfCount: pdfFiles.length });
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
-    const [pdfs, existingRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace))]);
+    const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace))]);
     const existingByCadastral = new Map(existingRows.map((row) => [cadastralDigits(row.cadastralNumber), row]));
+    const knownStatuses = new Set(statusRows.map(({ name }) => name));
     const importedCategories: Record<string, CategoryDefinition> = {}; const warnings: string[] = []; const usedPdfs = new Set<string>(); const prepared: PreparedPlot[] = []; const batchCadastrals = new Set<string>();
 
     for (const geoFile of geoFiles) {
@@ -50,6 +51,10 @@ export async function POST(request: Request) {
         if (document) usedPdfs.add(document.file.name); else warnings.push(`Для ${geoFile.name} не знайдено PDF; ділянку імпортовано без документа.`);
         const metadata = document?.metadata;
         const feature: PlotFeature = { ...original, properties: { ...original.properties, cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber, areaHa: metadata?.areaHa || original.properties.areaHa, owner: metadata?.owner || original.properties.owner, lessee: metadata?.lessee || original.properties.lessee, sourceFilename: geoStem } };
+        if (feature.properties.status && !knownStatuses.has(feature.properties.status)) {
+          warnings.push(`${geoFile.name}: статус «${feature.properties.status}» відсутній у довіднику; ділянку імпортовано без статусу.`);
+          feature.properties.status = "";
+        }
         const cadastral = cadastralDigits(feature.properties.cadastralNumber);
         if (cadastral.length !== 19) throw new Error(`${geoFile.name}: не вдалося визначити повний кадастровий номер.`);
         if (batchCadastrals.has(cadastral)) throw new Error(`${feature.properties.cadastralNumber}: кадастровий номер повторюється у пакеті.`);

@@ -66,7 +66,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         mainCandidateCadastral: "",
         owner: "Демо-власник",
         lessee: "Демо-орендар",
-        status: "Опрацювання",
+        status: "обрана ділянка як варіант",
       },
     },
     {
