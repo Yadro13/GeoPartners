@@ -400,8 +400,9 @@ async function run() {
   assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress?.some((item) => item.statusId === statusId), "Status rename removed plot stage progress.");
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: statusCatalog.payload });
   const clearedPlot = await request("/api/plots", { jar: userJar });
-  assert(clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === "", "Deleted status was not cleared from the plot.");
-  assert(!clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress?.some((item) => item.statusId === statusId), "Deleted status was not removed from plot stage progress.");
+  const clearedProperties = clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(clearedProperties?.status === statusCatalog.payload[0].name, "Deleting the latest stage did not fall back to the preceding completed stage.");
+  assert(!clearedProperties?.statusProgress?.some((item) => item.statusId === statusId), "Deleted status was not removed from plot stage progress.");
   const categoryRows = await client.query("select id, name, description, color, visible from category where workspace = 'sandbox' order by id");
   const categoryCatalog = Object.fromEntries(categoryRows.rows.map((item) => [item.id, { name: item.name, description: item.description, color: item.color, visible: item.visible }]));
   await request("/api/categories", {
