@@ -358,7 +358,7 @@ async function run() {
   const decidedRequest = await client.query("select status, decided_by as \"decidedBy\", comment from registration_request where id = $1", [registration.id]);
   assert(decidedRequest.rows[0]?.status === "approved" && [admin.id, secondApplicant.id].includes(decidedRequest.rows[0]?.decidedBy), "Registration decision author was not persisted.");
   const processedPage = await request(`/admin/registrations/${registration.id}`, { jar: secondAdminJar });
-  assert(typeof processedPage.payload === "string" && processedPage.payload.includes("Результат розгляду") && processedPage.payload.includes(reviewComment), "Processed registration result page is incomplete.");
+  assert(typeof processedPage.payload === "string" && processedPage.payload.includes("Review result") && processedPage.payload.includes(reviewComment), "Processed registration result page is incomplete.");
   const decisionNotice = await waitForMessage(userEmail, (item) => item.Subject === "Zugang zu GeoPartners genehmigt");
   assert((await mailpitText(decisionNotice.ID)).includes(reviewComment), "Approval email does not include the administrator comment.");
   logStep("atomic administrator approval, recorded reviewer, result page and decision email passed");
