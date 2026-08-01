@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function RegistrationDecisionResult({ status, reviewer, decidedAt, comment }: {
   status: "approved" | "rejected" | "suspended";
@@ -6,13 +7,14 @@ export function RegistrationDecisionResult({ status, reviewer, decidedAt, commen
   decidedAt: string;
   comment: string | null;
 }) {
-  const label = status === "approved" ? "Підтверджено" : status === "rejected" ? "Відхилено" : "Призупинено";
+  const t = useTranslations("admin");
+  const label = status === "approved" ? t("approved") : status === "rejected" ? t("rejected") : t("suspended");
   return <section className="decision-result" data-status={status}>
-    <header>{status === "approved" ? <CheckCircle2 size={22} /> : <XCircle size={22} />}<div><span>Результат розгляду</span><strong>{label}</strong></div></header>
+    <header>{status === "approved" ? <CheckCircle2 size={22} /> : <XCircle size={22} />}<div><span>{t("reviewResult")}</span><strong>{label}</strong></div></header>
     <dl>
-      <div><dt>Рішення прийняв</dt><dd>{reviewer ? <>{reviewer.name}<small>{reviewer.email}</small></> : "Адміністратор недоступний"}</dd></div>
-      <div><dt>Дата рішення</dt><dd>{decidedAt}</dd></div>
-      <div><dt>Коментар</dt><dd>{comment || "Без коментаря"}</dd></div>
+      <div><dt>{t("decidedBy")}</dt><dd>{reviewer ? <>{reviewer.name}<small>{reviewer.email}</small></> : t("adminUnavailable")}</dd></div>
+      <div><dt>{t("decisionDate")}</dt><dd>{decidedAt}</dd></div>
+      <div><dt>{t("comment")}</dt><dd>{comment || t("noComment")}</dd></div>
     </dl>
   </section>;
 }

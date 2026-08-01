@@ -8,7 +8,7 @@ export type PlotFeature = Feature<Polygon, PlotProperties>;
 
 export type WorkspaceSection = "map" | "layers" | "reports" | "history" | "users" | "settings" | "profile";
 export type BaseMapId = "streets" | "light" | "satellite";
-export type WorkspaceUser = { name: string; email: string; role: "user" | "admin"; accessLevel: "read" | "edit" };
+export type WorkspaceUser = { name: string; email: string; role: "user" | "admin"; accessLevel: "read" | "edit"; locale?: "uk" | "de" | "en" };
 
 export type WorkspaceActions = {
   select: (id: string) => void;

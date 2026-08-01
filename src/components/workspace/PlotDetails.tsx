@@ -1,4 +1,5 @@
 import { ExternalLink, FileText, ListChecks, Pencil } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
@@ -16,8 +17,10 @@ type PlotDetailsProps = {
 };
 
 export function PlotDetails({ plot, compact = false, categories, plotStatuses, onEdit, onOpenStages, onDocuments, onOpenCard }: PlotDetailsProps) {
+  const t = useTranslations("workspace");
+  const format = useFormatter();
   if (!plot) {
-    return <div className="plot-details-empty">Оберіть ділянку на карті або у списку.</div>;
+    return <div className="plot-details-empty">{t("selectPlot")}</div>;
   }
 
   const { properties } = plot;
@@ -29,10 +32,10 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, o
     <div className="plot-details" data-compact={compact}>
       <header className="plot-details__header">
         <div>
-          <span className="eyebrow">Кадастровий номер</span>
+          <span className="eyebrow">{t("cadastralNumber")}</span>
           <h2>{properties.cadastralNumber}</h2>
         </div>
-        {onEdit ? <button className="icon-button" type="button" onClick={() => onEdit(plot)} title="Редагувати ділянку" aria-label="Редагувати ділянку">
+        {onEdit ? <button className="icon-button" type="button" onClick={() => onEdit(plot)} title={t("editPlot")} aria-label={t("editPlot")}>
           <Pencil size={18} aria-hidden="true" />
         </button> : null}
       </header>
@@ -43,25 +46,25 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, o
       </div>
 
       <dl className="details-grid">
-        <div><dt>Площа</dt><dd>{properties.areaHa.toLocaleString("uk-UA", { maximumFractionDigits: 4 })} га</dd></div>
-        <div><dt>Етапи</dt><dd>{completedStages.length} із {plotStatuses.length} пройдено</dd></div>
-        {totalCost > 0 ? <div><dt>Загальні витрати</dt><dd>{totalCost.toLocaleString("uk-UA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} грн</dd></div> : null}
-        <div><dt>Власник</dt><dd>{properties.owner}</dd></div>
-        <div><dt>Орендар</dt><dd>{properties.lessee}</dd></div>
+        <div><dt>{t("area")}</dt><dd>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} ha</dd></div>
+        <div><dt>{t("stages")}</dt><dd>{t("stagesDone", { done: completedStages.length, total: plotStatuses.length })}</dd></div>
+        {totalCost > 0 ? <div><dt>{t("totalExpenses")}</dt><dd>{format.number(totalCost, { style: "currency", currency: "UAH" })}</dd></div> : null}
+        <div><dt>{t("owner")}</dt><dd>{properties.owner}</dd></div>
+        <div><dt>{t("lessee")}</dt><dd>{properties.lessee}</dd></div>
       </dl>
 
       <div className="plot-details__actions">
         <button className="command-button command-button--primary plot-details__stages" type="button" onClick={() => onOpenStages(plot)}>
           <ListChecks size={18} aria-hidden="true" />
-          Етапи ({completedStages.length}/{plotStatuses.length})
+          {t("stagesButton", { done: completedStages.length, total: plotStatuses.length })}
         </button>
         <button className="command-button" type="button" onClick={() => onDocuments(plot)}>
           <FileText size={18} aria-hidden="true" />
-          Документи
+          {t("documents")}
         </button>
-        <button className="command-button" type="button" onClick={() => onOpenCard(plot)} title="Відкрити картку в окремому поданні">
+        <button className="command-button" type="button" onClick={() => onOpenCard(plot)} title={t("openCard")}>
           <ExternalLink size={18} aria-hidden="true" />
-          Картка
+          {t("card")}
         </button>
       </div>
     </div>

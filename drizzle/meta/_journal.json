@@ -57,6 +57,13 @@
       "when": 1785616283738,
       "tag": "0007_curly_obadiah_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785623902854,
+      "tag": "0008_yellow_champions",
+      "breakpoints": true
     }
   ]
 }

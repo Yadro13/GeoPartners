@@ -1,16 +1,16 @@
-export function oauthErrorMessage(code: string | null) {
+export function oauthErrorKey(code: string | null) {
   if (!code) return null;
 
   switch (code.toLowerCase()) {
     case "access_denied":
-      return "Вхід через Google скасовано.";
+      return "oauthAccessDenied";
     case "account_not_linked":
-      return "Google-акаунт ще не підключено до цього облікового запису.";
+      return "oauthNotLinked";
     case "forbidden":
-      return "Для цього облікового запису вхід через Google недоступний.";
+      return "oauthForbidden";
     case "signup_disabled":
-      return "Реєстрація через Google тимчасово недоступна.";
+      return "oauthSignupDisabled";
     default:
-      return "Не вдалося завершити вхід через Google. Спробуйте ще раз.";
+      return "oauthFailed";
   }
 }

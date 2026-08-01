@@ -7,6 +7,7 @@
 - Next.js 16, React 19, TypeScript;
 - PostgreSQL, Drizzle ORM;
 - Better Auth: email/пароль та Google OAuth;
+- next-intl: український, німецький та англійський інтерфейс;
 - Leaflet, Turf.js;
 - Railway: web, PostgreSQL, worker сповіщень, cron резервних копій та Object Storage.
 
@@ -44,5 +45,6 @@ npm run test:e2e
 - [Приймальний чек-лист](docs/ACCEPTANCE_CHECKLIST.md)
 - [Backlog тестового середовища](docs/STAGING_BACKLOG.md)
 - [Питання до замовника](docs/CUSTOMER_QUESTIONS.md)
+- [Реєстр функцій поза ТЗ договору](docs/OUT_OF_SCOPE_WORK.md)
 
 Секрети зберігаються лише у змінних Railway або локальному `.env.local`. Архіви БД, завантажені документи та реальні облікові дані не додаються до Git.

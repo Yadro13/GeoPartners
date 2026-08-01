@@ -4,7 +4,7 @@ import type { LandDocumentMetadata } from "@/lib/pdf-metadata";
 import { categoriesWithDefaults, normalizeImport } from "@/lib/plot-data";
 import { calculatePolygonAreaHa, findPlotConflicts, repairPolygonGeometry, validatePolygonGeometry, type GeometryRepairAction, type GeometryValidationIssue, type GeometryValidationMarker, type PlotConflict } from "@/lib/geometry";
 
-export type ImportIssue = { level: "warning" | "error"; message: string; dedupeKey?: string };
+export type ImportIssue = { level: "warning" | "error"; message: string; code?: string; values?: Record<string, string | number>; dedupeKey?: string };
 export type ImportCandidate = {
   key: string;
   included: boolean;
@@ -41,14 +41,14 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
     try {
       const parsed = normalizeImport(JSON.parse(await file.text()), file.name);
       Object.assign(importedCategories, parsed.categories);
-      parsed.skipped.forEach((message) => packageIssues.push({ level: "warning", message: `${message} Об'єкт пропущено.` }));
+      parsed.skipped.forEach((message) => packageIssues.push({ level: "warning", message: `${message} Об'єкт пропущено.`, code: "object-skipped" }));
       for (const original of parsed.plots) {
         const issues: ImportIssue[] = []; const geoDigits = digits(original.properties.cadastralNumber); const geoStem = stem(file.name);
         const byStem = documents.find((document) => document.stem === geoStem);
         const byCad = documents.find((document) => digits(document.metadata.cadastralNumber) === geoDigits && geoDigits.length === 19);
         const document = byCad ?? byStem ?? null;
-        if (document && geoDigits.length === 19 && document.metadata.cadastralNumber && digits(document.metadata.cadastralNumber) !== geoDigits) issues.push({ level: "error", message: `Кадастровий номер не збігається з ${document.name}.` });
-        if (!document) issues.push({ level: "warning", message: "PDF не знайдено; буде збережено лише геометрію." });
+        if (document && geoDigits.length === 19 && document.metadata.cadastralNumber && digits(document.metadata.cadastralNumber) !== geoDigits) issues.push({ level: "error", message: `Кадастровий номер не збігається з ${document.name}.`, code: "cad-mismatch", values: { name: document.name } });
+        if (!document) issues.push({ level: "warning", message: "PDF не знайдено; буде збережено лише геометрію.", code: "pdf-missing" });
         const metadata = document?.metadata;
         const plot: PlotFeature = { ...original, properties: { ...original.properties,
           cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber,
@@ -59,17 +59,17 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
           hasDocument: Boolean(document),
         } };
         const finalDigits = digits(plot.properties.cadastralNumber);
-        if (finalDigits.length !== 19) issues.push({ level: "error", message: "Не вдалося визначити повний кадастровий номер." });
+        if (finalDigits.length !== 19) issues.push({ level: "error", message: "Не вдалося визначити повний кадастровий номер.", code: "invalid-cad" });
         const existing = existingPlots.find(({ properties }) => digits(properties.cadastralNumber) === finalDigits && finalDigits.length === 19);
         if (existing) plot.properties.id = existing.properties.id;
         candidates.push({ key: `${file.name}-${plot.properties.id}`, included: true, geoName: file.name, pdfName: document?.name ?? null, plot, action: existing ? "update" : "create", coordinateCount: plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), sourceIssues: issues, issues: [], conflicts: [], geometryIssues: [], validationMarkers: [], repairActions: [], appliedRepairs: [] });
       }
-    } catch (error) { packageIssues.push({ level: "error", message: `${file.name}: ${error instanceof Error ? error.message : "не вдалося прочитати GeoJSON"}` }); }
+    } catch (error) { packageIssues.push({ level: "error", message: `${file.name}: ${error instanceof Error ? error.message : "не вдалося прочитати GeoJSON"}`, code: "geo-read", values: { name: file.name } }); }
   }
 
   const usedPdfs = new Set(candidates.flatMap((candidate) => candidate.pdfName ? [candidate.pdfName] : []));
-  documents.filter((document) => !usedPdfs.has(document.name)).forEach((document) => packageIssues.push({ level: "warning", message: `${document.name}: немає відповідного GeoJSON.` }));
-  if (!candidates.length) packageIssues.push({ level: "error", message: "У пакеті немає придатних ділянок." });
+  documents.filter((document) => !usedPdfs.has(document.name)).forEach((document) => packageIssues.push({ level: "warning", message: `${document.name}: немає відповідного GeoJSON.`, code: "pdf-unmatched", values: { name: document.name } }));
+  if (!candidates.length) packageIssues.push({ level: "error", message: "У пакеті немає придатних ділянок.", code: "no-plots" });
   return finalizeReview(candidates, categoriesWithDefaults({ ...currentCategories, ...importedCategories }), packageIssues, existingPlots);
 }
 
@@ -123,8 +123,8 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
   for (const candidate of includedCandidates) finalPlots.set(candidate.plot.properties.id, candidate.plot);
   const finalized = candidates.map((candidate) => {
     const validation = validatePolygonGeometry(candidate.plot.geometry); const repair = repairPolygonGeometry(candidate.plot.geometry);
-    const duplicate = digits(candidate.plot.properties.cadastralNumber); const duplicateIssues: ImportIssue[] = candidate.included && duplicate.length === 19 && (cadastralGroups.get(duplicate)?.length ?? 0) > 1 ? [{ level: "error", message: "Цей кадастровий номер повторюється у пакеті." }] : [];
-    const next: ImportCandidate = { ...candidate, coordinateCount: candidate.plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), issues: [...candidate.sourceIssues, ...duplicateIssues, ...validation.issues.map(({ level, message }) => ({ level, message }))], conflicts: [], geometryIssues: validation.issues, validationMarkers: validation.markers, repairActions: repair.actions };
+    const duplicate = digits(candidate.plot.properties.cadastralNumber); const duplicateIssues: ImportIssue[] = candidate.included && duplicate.length === 19 && (cadastralGroups.get(duplicate)?.length ?? 0) > 1 ? [{ level: "error", message: "Цей кадастровий номер повторюється у пакеті.", code: "duplicate-cad" }] : [];
+    const next: ImportCandidate = { ...candidate, coordinateCount: candidate.plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), issues: [...candidate.sourceIssues, ...duplicateIssues, ...validation.issues.map(({ level, message, code }) => ({ level, message, code: `geometry-${code}` }))], conflicts: [], geometryIssues: validation.issues, validationMarkers: validation.markers, repairActions: repair.actions };
     if (!candidate.included) return next;
     if (validation.issues.some(({ level }) => level === "error")) return next;
     const neighbors = [...finalPlots.values()].filter(({ properties }) => properties.id !== candidate.plot.properties.id);
@@ -133,7 +133,7 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
       const pairKey = [candidate.plot.properties.id, conflict.plotId].sort().join(":");
       const source = includedIds.has(conflict.plotId) ? "між файлами пакета" : "з ділянкою у поточній базі";
       const label = conflict.scale === "micro" ? "Мікронакладання" : "Накладання";
-      next.issues.push({ level: "warning", dedupeKey: `overlap:${pairKey}`, message: `${label} ${formatSquareMeters(conflict.overlapAreaSquareMeters)} з ${conflict.cadastralNumber} · ${source}. Координати буде збережено без змін.` });
+      next.issues.push({ level: "warning", code: "overlap", values: { area: conflict.overlapAreaSquareMeters, cadastral: conflict.cadastralNumber, source: includedIds.has(conflict.plotId) ? "package" : "database", scale: conflict.scale }, dedupeKey: `overlap:${pairKey}`, message: `${label} ${formatSquareMeters(conflict.overlapAreaSquareMeters)} з ${conflict.cadastralNumber} · ${source}. Координати буде збережено без змін.` });
     }
     return next;
   });

@@ -7,6 +7,8 @@ import { notificationOutbox, registrationRequest, user } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { errorFields, serverLog } from "@/lib/server-log";
+import { emailMessages } from "@/i18n/email-messages";
+import { normalizeAppLocale } from "@/i18n/server-locale";
 
 const bodySchema = z.object({
   decision: z.enum(["approved", "rejected"]),
@@ -43,12 +45,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const approved = parsed.data.decision === "approved";
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const commentText = parsed.data.comment ? `\n\nКоментар адміністратора: ${parsed.data.comment}` : "";
+  const locale = normalizeAppLocale(applicant.locale);
+  const message = emailMessages(locale).decision(approved, parsed.data.comment, appUrl);
   try {
     await sendEmail({
       to: applicant.email,
-      subject: approved ? "Доступ до GeoPartners підтверджено" : "Результат реєстрації у GeoPartners",
-      text: `${approved ? `Вашу реєстрацію підтверджено. Увійти: ${appUrl}/sign-in` : "Вашу заявку на доступ відхилено."}${commentText}`,
+      ...message,
     });
     serverLog("info", "registration.decision_notification.sent", { decision: parsed.data.decision });
   } catch (error) {
@@ -57,7 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       channel: "email",
       recipient: applicant.email,
       template: "registration-decision",
-      payload: { decision: parsed.data.decision, comment: parsed.data.comment, appUrl },
+      payload: { decision: parsed.data.decision, comment: parsed.data.comment, appUrl, locale, subject: message.subject, text: message.text },
       status: "failed",
       attempts: "1",
       lastError: error instanceof Error ? error.message : String(error),

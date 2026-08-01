@@ -37,6 +37,7 @@
     "leaflet": "1.9.4",
     "lucide-react": "1.25.0",
     "next": "16.2.11",
+    "next-intl": "^4.13.4",
     "nodemailer": "9.0.3",
     "pdf-parse": "^2.4.5",
     "pdfmake": "^0.2.20",
@@ -64,7 +65,7 @@
     "typescript": "6.0.3"
   },
   "overrides": {
-    "postcss": "8.5.10",
+    "postcss": "8.5.25",
     "sharp": "0.35.0"
   }
 }

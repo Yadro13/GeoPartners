@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { GeoJSON, MapContainer, Polygon as LeafletPolygon, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { MousePointer2, PenTool, RotateCcw, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { Feature, MultiPolygon, Polygon } from "geojson";
 import type { LeafletEvent, LeafletEventHandlerFn, Polygon as LeafletPolygonLayer } from "leaflet";
 import "@geoman-io/leaflet-geoman-free";
@@ -20,6 +21,7 @@ const tiles: Record<BaseMapId, { url: string; attribution: string; maxZoom: numb
 };
 
 export function GeometryEditorMap({ geometry, initialGeometry, neighbors, conflicts, baseMap, onChange }: { geometry: Polygon | null; initialGeometry: Polygon | null; neighbors: PlotFeature[]; conflicts: PlotConflict[]; baseMap: BaseMapId; onChange: (geometry: Polygon | null, reason: GeometryChangeReason) => void }) {
+  const t = useTranslations("mapEditor");
   const [mode, setMode] = useState<EditorMode>("idle"); const [message, setMessage] = useState(""); const tile = tiles[baseMap];
   const editorActions = useRef<EditorActions | null>(null);
   const stopEditing = () => { editorActions.current?.finish(); setMode("idle"); };
@@ -29,12 +31,13 @@ export function GeometryEditorMap({ geometry, initialGeometry, neighbors, confli
   const toggleEditing = () => { if (mode === "edit") stopEditing(); else setMode("edit"); };
   const clear = () => { cancelEditing(); onChange(null, "clear"); };
   return <div className="geometry-editor" data-mode={mode}>
-    <div className="geometry-editor__toolbar" role="toolbar" aria-label="Редактор контуру"><button type="button" data-active={mode === "draw"} onClick={startDrawing} title="Намалювати новий контур"><PenTool size={17} /><span>Новий</span></button><button type="button" data-active={mode === "edit"} disabled={!geometry} onClick={toggleEditing} title="Редагувати вершини"><MousePointer2 size={17} /><span>Вершини</span></button><button type="button" disabled={!geometry} onClick={reset} title="Скасувати зміни"><RotateCcw size={17} /><span>Скасувати</span></button><button type="button" disabled={!geometry} onClick={clear} title="Очистити контур"><Trash2 size={17} /><span>Очистити</span></button><span className="geometry-editor__status">{message || (geometry ? `${geometry.coordinates.reduce((count, ring) => count + ring.length, 0)} точок · ${neighbors.length} поруч` : `${neighbors.length} ділянок поруч`)}</span></div>
+    <div className="geometry-editor__toolbar" role="toolbar" aria-label={t("toolbar")}><button type="button" data-active={mode === "draw"} onClick={startDrawing} title={t("drawTitle")}><PenTool size={17} /><span>{t("new")}</span></button><button type="button" data-active={mode === "edit"} disabled={!geometry} onClick={toggleEditing} title={t("editVertices")}><MousePointer2 size={17} /><span>{t("vertices")}</span></button><button type="button" disabled={!geometry} onClick={reset} title={t("undo")}><RotateCcw size={17} /><span>{t("cancel")}</span></button><button type="button" disabled={!geometry} onClick={clear} title={t("clearTitle")}><Trash2 size={17} /><span>{t("clear")}</span></button><span className="geometry-editor__status">{message || (geometry ? t("pointsNearby", { points: geometry.coordinates.reduce((count, ring) => count + ring.length, 0), neighbors: neighbors.length }) : t("plotsNearby", { neighbors: neighbors.length }))}</span></div>
     <div className="geometry-editor__map"><MapContainer center={[49.442, 26.651]} zoom={14} zoomControl={false} attributionControl={false}><TileLayer key={baseMap} attribution={tile.attribution} url={tile.url} maxZoom={tile.maxZoom} /><ZoomControl position="bottomright" /><GeometryBridge geometry={geometry} neighbors={neighbors} conflicts={conflicts} mode={mode} editorActionsRef={editorActions} onChange={onChange} onModeChange={setMode} onMessage={setMessage} /></MapContainer></div>
   </div>;
 }
 
 function GeometryBridge({ geometry, neighbors, conflicts, mode, editorActionsRef, onChange, onModeChange, onMessage }: { geometry: Polygon | null; neighbors: PlotFeature[]; conflicts: PlotConflict[]; mode: EditorMode; editorActionsRef: MutableRefObject<EditorActions | null>; onChange: (geometry: Polygon | null, reason: GeometryChangeReason) => void; onModeChange: (mode: EditorMode) => void; onMessage: (message: string) => void }) {
+  const t = useTranslations("mapEditor");
   const map = useMap(); const layerRef = useRef<LeafletPolygonLayer | null>(null);
   const geometryFromLayer = useCallback((layer: LeafletPolygonLayer) => {
     const feature = layer.toGeoJSON() as Feature<Polygon>;
@@ -45,31 +48,31 @@ function GeometryBridge({ geometry, neighbors, conflicts, mode, editorActionsRef
     const created = (event: LeafletEvent & { layer: LeafletPolygonLayer; shape: string }) => {
       if (event.shape !== "Polygon") return;
       const layer = event.layer as LeafletPolygonLayer;
-      const next = geometryFromLayer(layer); if (next) onChange(next, "draw"); map.removeLayer(layer); map.pm.disableDraw("Polygon"); onModeChange("idle"); onMessage("Новий контур готовий");
+      const next = geometryFromLayer(layer); if (next) onChange(next, "draw"); map.removeLayer(layer); map.pm.disableDraw("Polygon"); onModeChange("idle"); onMessage(t("outlineReady"));
     };
     map.on("pm:create", created as LeafletEventHandlerFn);
     return () => { map.off("pm:create", created as LeafletEventHandlerFn); map.pm.disableDraw(); };
-  }, [geometryFromLayer, map, onChange, onMessage, onModeChange]);
+  }, [geometryFromLayer, map, onChange, onMessage, onModeChange, t]);
 
   useEffect(() => {
     if (mode === "draw") {
       layerRef.current?.pm.disable();
-      map.pm.enableDraw("Polygon", { allowSelfIntersection: false, snappable: true, snapDistance: 18, finishOn: "dblclick" }); onMessage("Малювання контуру");
+      map.pm.enableDraw("Polygon", { allowSelfIntersection: false, snappable: true, snapDistance: 18, finishOn: "dblclick" }); onMessage(t("drawing"));
     } else map.pm.disableDraw();
     if (mode !== "edit") layerRef.current?.pm.disable();
-  }, [map, mode, onMessage]);
+  }, [map, mode, onMessage, t]);
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
     if (!layer || mode !== "edit") return;
-    const intersected = () => onMessage("Самоперетин контуру заборонено");
-    layer.pm.enable({ allowSelfIntersection: false, snappable: true, snapDistance: 18 }); layer.on("pm:intersect", intersected); onMessage("Редагування вершин");
+    const intersected = () => onMessage(t("selfIntersection"));
+    layer.pm.enable({ allowSelfIntersection: false, snappable: true, snapDistance: 18 }); layer.on("pm:intersect", intersected); onMessage(t("editing"));
     editorActionsRef.current = {
       finish: () => { layer.pm.disable(); const next = geometryFromLayer(layer); if (next) onChange(next, "edit"); },
       cancel: () => { layer.pm.disable(); },
     };
     return () => { layer.off("pm:intersect", intersected); layer.pm.disable(); editorActionsRef.current = null; };
-  }, [editorActionsRef, geometryFromLayer, mode, onChange, onMessage]);
+  }, [editorActionsRef, geometryFromLayer, mode, onChange, onMessage, t]);
 
   useEffect(() => {
     if (mode === "edit") return;

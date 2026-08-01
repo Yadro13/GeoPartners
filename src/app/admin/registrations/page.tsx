@@ -4,9 +4,13 @@ import { ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { registrationRequest, user } from "@/db/schema";
 import { requireAdmin } from "@/lib/access";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { getFormatter, getTranslations } from "next-intl/server";
 import "../admin.css";
 
 export default async function RegistrationsPage() {
+  const t = await getTranslations("admin");
+  const format = await getFormatter();
   await requireAdmin("/admin/registrations");
   const requests = await db
     .select({ request: registrationRequest, applicant: user })
@@ -18,17 +22,18 @@ export default async function RegistrationsPage() {
     <main className="admin-shell">
       <AdminHeader />
       <div className="admin-content">
-        <div className="admin-title"><span className="eyebrow">Адміністрування</span><h1>Заявки на доступ</h1></div>
-        {requests.length ? <div className="request-list">{requests.map(({ request, applicant }) => <Link className="request-row" href={`/admin/registrations/${request.id}`} key={request.id}><div><strong>{applicant.name}</strong><span>{applicant.email}</span></div><time>{request.submittedAt.toLocaleString("uk-UA")}</time><span className="request-badge">{statusLabel(request.status)}</span><ChevronRight size={18} /></Link>)}</div> : <div className="admin-empty">Нових заявок немає.</div>}
+        <div className="admin-title"><span className="eyebrow">{t("administration")}</span><h1>{t("accessRequests")}</h1></div>
+        {requests.length ? <div className="request-list">{requests.map(({ request, applicant }) => <Link className="request-row" href={`/admin/registrations/${request.id}`} key={request.id}><div><strong>{applicant.name}</strong><span>{applicant.email}</span></div><time>{format.dateTime(request.submittedAt, { dateStyle: "medium", timeStyle: "short" })}</time><span className="request-badge">{statusLabel(request.status, t)}</span><ChevronRight size={18} /></Link>)}</div> : <div className="admin-empty">{t("noRequests")}</div>}
       </div>
     </main>
   );
 }
 
-function AdminHeader() {
-  return <header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><Link href="/">Повернутися до карти</Link></header>;
+async function AdminHeader() {
+  const t = await getTranslations("admin");
+  return <header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><div className="admin-header__actions"><LanguageSwitcher compact /><Link href="/">{t("backToMap")}</Link></div></header>;
 }
 
-function statusLabel(status: string) {
-  return ({ pending: "Очікує", approved: "Підтверджено", rejected: "Відхилено", suspended: "Призупинено" } as Record<string, string>)[status] ?? status;
+function statusLabel(status: string, t: (key: "pendingShort" | "approved" | "rejected" | "suspended") => string) {
+  return ({ pending: t("pendingShort"), approved: t("approved"), rejected: t("rejected"), suspended: t("suspended") } as Record<string, string>)[status] ?? status;
 }

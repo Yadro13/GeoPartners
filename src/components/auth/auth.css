@@ -17,8 +17,14 @@
   color: var(--ink);
   display: flex;
   gap: 10px;
-  margin-bottom: 44px;
   text-decoration: none;
+}
+
+.auth-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 44px;
 }
 
 .auth-heading h1 {

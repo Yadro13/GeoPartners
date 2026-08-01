@@ -7,6 +7,8 @@ import * as schema from "@/db/schema";
 import { sendEmail } from "./email";
 import { createRegistrationRequest } from "./registration";
 import { errorFields, serverLog } from "./server-log";
+import { emailMessages } from "@/i18n/email-messages";
+import { getRequestLocale, normalizeAppLocale } from "@/i18n/server-locale";
 
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -27,11 +29,10 @@ export const auth = betterAuth({
     minPasswordLength: 10,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
+      const locale = normalizeAppLocale((user as { locale?: unknown }).locale ?? await getRequestLocale());
       void sendEmail({
         to: user.email,
-        subject: "Відновлення пароля GeoPartners",
-        text: `Щоб встановити новий пароль, відкрийте посилання: ${url}`,
-        html: `<p>Щоб встановити новий пароль GeoPartners, відкрийте посилання:</p><p><a href="${url}">Встановити новий пароль</a></p>`,
+        ...emailMessages(locale).passwordReset(url),
       }).catch((error) => serverLog("error", "auth.password_reset.delivery_failed", errorFields(error)));
     },
   },
@@ -42,11 +43,10 @@ export const auth = betterAuth({
     expiresIn: 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
       try {
+        const locale = normalizeAppLocale((user as { locale?: unknown }).locale ?? await getRequestLocale());
         await sendEmail({
           to: user.email,
-          subject: "Підтвердження email у GeoPartners",
-          text: `Підтвердіть адресу email за посиланням: ${url}`,
-          html: `<p>Підтвердіть адресу email для реєстрації у GeoPartners.</p><p><a href="${url}">Підтвердити email</a></p><p>Посилання дійсне протягом однієї години.</p>`,
+          ...emailMessages(locale).verification(url),
         });
         serverLog("info", "auth.email_verification.sent");
       } catch (error) {
@@ -90,6 +90,7 @@ export const auth = betterAuth({
       reviewComment: { type: "string", required: false, input: false },
       reviewedAt: { type: "date", required: false, input: false },
       reviewedBy: { type: "string", required: false, input: false },
+      locale: { type: "string", defaultValue: "uk", input: false },
     },
   },
   databaseHooks: {
@@ -97,12 +98,14 @@ export const auth = betterAuth({
       create: {
         before: async (newUser) => {
           const isAdmin = Boolean(adminEmail && newUser.email.toLowerCase() === adminEmail);
+          const locale = await getRequestLocale();
           return {
             data: {
               ...newUser,
               role: isAdmin ? "admin" : "user",
               accessLevel: isAdmin ? "edit" : "read",
               approvalStatus: isAdmin ? "approved" : "pending",
+              locale,
             },
           };
         },

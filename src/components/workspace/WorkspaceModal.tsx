@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function WorkspaceModal({ title, description, children, onClose, wide = false }: { title: string; description?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+  const common = useTranslations("common");
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
 
@@ -59,7 +61,7 @@ export function WorkspaceModal({ title, description, children, onClose, wide = f
 
   return <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className="workspace-modal" data-wide={wide} role="dialog" aria-modal="true" aria-labelledby="workspace-modal-title" aria-describedby={description ? "workspace-modal-description" : undefined} tabIndex={-1}>
-      <header><div><h2 id="workspace-modal-title">{title}</h2>{description ? <p id="workspace-modal-description">{description}</p> : null}</div><button className="icon-button" type="button" onClick={onClose} aria-label="Закрити"><X size={20} /></button></header>
+      <header><div><h2 id="workspace-modal-title">{title}</h2>{description ? <p id="workspace-modal-description">{description}</p> : null}</div><button className="icon-button" type="button" onClick={onClose} aria-label={common("close")}><X size={20} /></button></header>
       <div className="workspace-modal__body">{children}</div>
     </section>
   </div>;

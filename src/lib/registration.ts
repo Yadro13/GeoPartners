@@ -4,6 +4,9 @@ import { notificationOutbox, registrationRequest, user } from "@/db/schema";
 import { sendEmail } from "./email";
 import { sendTelegramMessage } from "./telegram";
 import { errorFields, serverLog } from "./server-log";
+import { emailMessages } from "@/i18n/email-messages";
+import { defaultLocale } from "@/i18n/config";
+import { normalizeAppLocale } from "@/i18n/server-locale";
 
 type RegistrationMethod = "password" | "google";
 
@@ -32,26 +35,30 @@ export async function createRegistrationRequest(userId: string, method: Registra
 async function notifyAdminAboutRegistration(input: { requestId: string; name: string; email: string; method: RegistrationMethod }) {
   const appUrl = process.env.APP_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
   const reviewUrl = `${appUrl}/admin/registrations/${input.requestId}`;
-  const methodLabel = input.method === "google" ? "Google" : "email і пароль";
-  const text = `Нова реєстрація в GeoPartners\nІм'я: ${input.name}\nEmail: ${input.email}\nСпосіб: ${methodLabel}\nПерегляд: ${reviewUrl}`;
   const activeAdmins = await db
-    .select({ email: user.email })
+    .select({ email: user.email, locale: user.locale })
     .from(user)
     .where(and(eq(user.role, "admin"), eq(user.approvalStatus, "approved")));
-  const adminEmails = new Set(activeAdmins.map(({ email }) => email.trim().toLowerCase()).filter(Boolean));
+  const adminEmails = new Map<string, ReturnType<typeof normalizeAppLocale>>();
+  for (const admin of activeAdmins) {
+    const email = admin.email.trim().toLowerCase();
+    if (email) adminEmails.set(email, normalizeAppLocale(admin.locale));
+  }
   const fallbackEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (!adminEmails.size && fallbackEmail) adminEmails.add(fallbackEmail);
+  if (!adminEmails.size && fallbackEmail) adminEmails.set(fallbackEmail, defaultLocale);
 
   const tasks: Array<{ channel: "email" | "telegram"; recipient: string; promise: Promise<unknown> }> = [];
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
-    tasks.push({ channel: "telegram", recipient: process.env.TELEGRAM_ADMIN_CHAT_ID, promise: sendTelegramMessage(text, { text: "Переглянути заявку", url: reviewUrl }) });
+    const telegramMessage = emailMessages(defaultLocale).newRegistration(input, reviewUrl);
+    tasks.push({ channel: "telegram", recipient: process.env.TELEGRAM_ADMIN_CHAT_ID, promise: sendTelegramMessage(telegramMessage.text, { text: telegramMessage.button, url: reviewUrl }) });
   }
-  for (const adminEmail of adminEmails) {
+  for (const [adminEmail, locale] of adminEmails) {
+    const message = emailMessages(locale).newRegistration(input, reviewUrl);
     tasks.push({ channel: "email", recipient: adminEmail, promise: sendEmail({
       to: adminEmail,
-      subject: "Нова заявка на доступ до GeoPartners",
-      text,
-      html: `<p>Нова заявка на доступ до GeoPartners.</p><p><strong>${escapeHtml(input.name)}</strong><br>${escapeHtml(input.email)}<br>Спосіб: ${methodLabel}</p><p><a href="${reviewUrl}">Переглянути заявку</a></p>`,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
     }) });
   }
 
@@ -62,11 +69,13 @@ async function notifyAdminAboutRegistration(input: { requestId: string; name: st
     const task = tasks[index];
     queued += 1;
     serverLog("warn", "registration.admin_notification.queued", { channel: task.channel, ...errorFields(result.reason) });
+    const locale = task.channel === "email" ? adminEmails.get(task.recipient) ?? defaultLocale : defaultLocale;
+    const message = emailMessages(locale).newRegistration(input, reviewUrl);
     await db.insert(notificationOutbox).values({
       channel: task.channel,
       recipient: task.recipient,
       template: "new-registration",
-      payload: { ...input, reviewUrl, text },
+      payload: { ...input, reviewUrl, locale, subject: message.subject, text: message.text, html: message.html, button: message.button },
       status: "failed",
       attempts: "1",
       lastError: result.reason instanceof Error ? result.reason.message : String(result.reason),
@@ -83,8 +92,4 @@ export async function getRegistration(requestId: string) {
     .where(eq(registrationRequest.id, requestId))
     .limit(1);
   return rows[0] ?? null;
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 }

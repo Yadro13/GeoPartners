@@ -87,7 +87,7 @@ async function deliver(notification, emailSender) {
         chat_id: notification.recipient,
         text: notification.payload.text,
         disable_web_page_preview: true,
-        ...(notification.payload.reviewUrl ? { reply_markup: { inline_keyboard: [[{ text: "Переглянути заявку", url: notification.payload.reviewUrl }]] } } : {}),
+        ...(notification.payload.reviewUrl ? { reply_markup: { inline_keyboard: [[{ text: notification.payload.button ?? "Переглянути заявку", url: notification.payload.reviewUrl }]] } } : {}),
       }),
     });
     if (!response.ok) throw Object.assign(new Error("Telegram delivery failed"), { code: `HTTP_${response.status}` });
@@ -99,6 +99,9 @@ async function deliver(notification, emailSender) {
 }
 
 function buildEmail(notification) {
+  if (notification.payload.subject && notification.payload.text) {
+    return { subject: notification.payload.subject, text: notification.payload.text, ...(notification.payload.html ? { html: notification.payload.html } : {}) };
+  }
   if (notification.template === "new-registration") {
     return { subject: "Нова заявка на доступ до GeoPartners", text: notification.payload.text };
   }

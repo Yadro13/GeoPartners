@@ -223,7 +223,7 @@ async function mailpitText(id) {
 
 async function databaseUser(email) {
   const result = await client.query(
-    `select id, role, access_level as "accessLevel", approval_status as "approvalStatus", email_verified as "emailVerified"
+    `select id, role, access_level as "accessLevel", approval_status as "approvalStatus", email_verified as "emailVerified", locale
        from "user" where email = $1`,
     [email],
   );
@@ -298,6 +298,8 @@ async function run() {
   });
   const secondAdminJar = await signIn(secondAdminEmail);
   assert((await databaseUser(secondAdminEmail))?.role === "admin", "Second administrator role was not persisted.");
+  await request("/api/locale", { method: "POST", jar: secondAdminJar, json: { locale: "en" } });
+  assert((await databaseUser(secondAdminEmail))?.locale === "en", "Administrator locale was not persisted.");
   logStep("second administrator provisioning passed");
 
   await signUp(userEmail, "Staging E2E User");
@@ -307,10 +309,12 @@ async function run() {
   assert(applicant?.role === "user" && applicant.accessLevel === "read" && applicant.approvalStatus === "pending" && applicant.emailVerified, "Applicant state after verification is invalid.");
   assert(registration?.status === "pending", "Registration request was not created.");
   const userJar = await signIn(userEmail);
+  await request("/api/locale", { method: "POST", jar: userJar, json: { locale: "de" } });
+  assert((await databaseUser(userEmail))?.locale === "de", "Applicant locale was not persisted.");
   await request("/api/plots", { jar: userJar, expected: [401] });
   const [adminNotice, secondAdminNotice] = await Promise.all([
     waitForMessageContaining(adminEmail, "Нова заявка на доступ до GeoPartners", userEmail),
-    waitForMessageContaining(secondAdminEmail, "Нова заявка на доступ до GeoPartners", userEmail),
+    waitForMessageContaining(secondAdminEmail, "New GeoPartners access request", userEmail),
   ]);
   assert((await mailpitText(adminNotice.ID)).includes("/admin/registrations/") && (await mailpitText(secondAdminNotice.ID)).includes("/admin/registrations/"), "Administrator notification does not contain the review link.");
   logStep("applicant registration, verification, pending state and multi-admin notifications passed");
@@ -355,7 +359,7 @@ async function run() {
   assert(decidedRequest.rows[0]?.status === "approved" && [admin.id, secondApplicant.id].includes(decidedRequest.rows[0]?.decidedBy), "Registration decision author was not persisted.");
   const processedPage = await request(`/admin/registrations/${registration.id}`, { jar: secondAdminJar });
   assert(typeof processedPage.payload === "string" && processedPage.payload.includes("Результат розгляду") && processedPage.payload.includes(reviewComment), "Processed registration result page is incomplete.");
-  const decisionNotice = await waitForMessage(userEmail, (item) => item.Subject === "Доступ до GeoPartners підтверджено");
+  const decisionNotice = await waitForMessage(userEmail, (item) => item.Subject === "Zugang zu GeoPartners genehmigt");
   assert((await mailpitText(decisionNotice.ID)).includes(reviewComment), "Approval email does not include the administrator comment.");
   logStep("atomic administrator approval, recorded reviewer, result page and decision email passed");
 

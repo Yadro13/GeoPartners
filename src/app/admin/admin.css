@@ -40,6 +40,19 @@
   gap: 6px;
 }
 
+.admin-header__actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-header .language-switcher select {
+  background: #25352d;
+  border-color: #53645a;
+  color: white;
+}
+
 .users-table {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -351,6 +364,21 @@
 }
 
 @media (max-width: 760px) {
+  .admin-header {
+    padding: 0 12px;
+  }
+
+  .admin-header__actions {
+    gap: 8px;
+  }
+
+  .admin-header__actions a {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .admin-content {
     padding: 22px 14px 36px;
   }

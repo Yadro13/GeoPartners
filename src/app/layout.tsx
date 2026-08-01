@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "GeoPartners",
-  description: "Керування земельними ділянками та геоданими",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("system");
+  return { title: "GeoPartners", description: t("description") };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -16,10 +18,12 @@ export const viewport: Viewport = {
   themeColor: "#17231d",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
   return (
-    <html lang="uk">
-      <body>{children}</body>
+    <html lang={locale}>
+      <body><NextIntlClientProvider locale={locale} messages={messages}>{children}</NextIntlClientProvider></body>
     </html>
   );
 }

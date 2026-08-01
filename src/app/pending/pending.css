@@ -16,7 +16,10 @@
   width: 100%;
 }
 
-.pending-panel > .brand-mark {
+.pending-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 28px;
 }
 

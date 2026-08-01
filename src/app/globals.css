@@ -73,6 +73,41 @@ textarea:focus-visible {
   margin: 12px 14px;
 }
 
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.language-switcher {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.language-switcher select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  height: 34px;
+  min-width: 118px;
+  padding: 0 8px;
+}
+
+.language-switcher[data-compact="true"] select {
+  min-width: 64px;
+  width: 64px;
+}
+
 .system-state {
   align-items: center;
   display: flex;

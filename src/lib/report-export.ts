@@ -1,6 +1,7 @@
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotFeature } from "@/components/workspace/types";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
+import { defaultLocale, intlLocale, isAppLocale, type AppLocale } from "@/i18n/config";
 
 export type ReportSummary = ReturnType<typeof summarizePlots>;
 
@@ -23,7 +24,9 @@ export function summarizePlots(plots: PlotFeature[], categories: Record<string, 
   };
 }
 
-export async function exportReportPdf(summary: ReportSummary) {
+export async function exportReportPdf(summary: ReportSummary, requestedLocale: string = defaultLocale) {
+  const locale = normalizeLocale(requestedLocale);
+  const labels = reportLabels[locale];
   const [{ default: pdfMake }, { default: pdfFonts }] = await Promise.all([
     import("pdfmake/build/pdfmake"),
     import("pdfmake/build/vfs_fonts"),
@@ -32,17 +35,17 @@ export async function exportReportPdf(summary: ReportSummary) {
   const fonts = pdfFonts as unknown as Record<string, string>;
   maker.vfs = fonts;
   const definition: TDocumentDefinitions = {
-    info: { title: "GeoPartners - зведений звіт" },
+    info: { title: `GeoPartners - ${labels.summaryReport}` },
     defaultStyle: { font: "Roboto", fontSize: 9 },
     content: [
       { text: "GeoPartners", style: "brand" },
-      { text: "Зведений звіт по земельних ділянках", style: "title" },
-      { text: `Сформовано: ${summary.generatedAt.toLocaleString("uk-UA")}`, color: "#66756d", margin: [0, 0, 0, 16] },
-      { columns: [metric("Ділянок", String(summary.count)), metric("Загальна площа", `${formatArea(summary.totalArea)} га`)], margin: [0, 0, 0, 18] },
-      { text: "Розподіл за категоріями", style: "heading" },
-      { table: { widths: ["*", 70, 90], body: [["Категорія", "Кількість", "Площа, га"], ...summary.byCategory.map((item) => [item.name, item.count, formatArea(item.area)])] }, layout: "lightHorizontalLines", margin: [0, 0, 0, 18] },
-      { text: "Перелік ділянок", style: "heading" },
-      { table: { headerRows: 1, widths: [105, "*", 52, 85], body: [["Кадастровий номер", "Назва / власник", "Площа", "Категорія"], ...summary.plots.map(({ properties }) => [properties.cadastralNumber, `${properties.name}\n${properties.owner}`, formatArea(properties.areaHa), summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category])] }, layout: "lightHorizontalLines" },
+      { text: labels.title, style: "title" },
+      { text: `${labels.generated}: ${summary.generatedAt.toLocaleString(intlLocale(locale))}`, color: "#66756d", margin: [0, 0, 0, 16] },
+      { columns: [metric(labels.plots, String(summary.count)), metric(labels.totalArea, `${formatArea(summary.totalArea, locale)} ${labels.ha}`)], margin: [0, 0, 0, 18] },
+      { text: labels.byCategory, style: "heading" },
+      { table: { widths: ["*", 70, 90], body: [[labels.category, labels.count, labels.areaHa], ...summary.byCategory.map((item) => [item.name, item.count, formatArea(item.area, locale)])] }, layout: "lightHorizontalLines", margin: [0, 0, 0, 18] },
+      { text: labels.plotList, style: "heading" },
+      { table: { headerRows: 1, widths: [105, "*", 52, 85], body: [[labels.cadastralNumber, labels.nameOwner, labels.area, labels.category], ...summary.plots.map(({ properties }) => [properties.cadastralNumber, `${properties.name}\n${properties.owner}`, formatArea(properties.areaHa, locale), summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category])] }, layout: "lightHorizontalLines" },
     ],
     styles: {
       brand: { bold: true, color: "#23754c", fontSize: 12, margin: [0, 0, 0, 6] },
@@ -54,22 +57,24 @@ export async function exportReportPdf(summary: ReportSummary) {
   maker.createPdf(definition).download(`geopartners-report-${dateStamp()}.pdf`);
 }
 
-export async function exportReportDocx(summary: ReportSummary) {
+export async function exportReportDocx(summary: ReportSummary, requestedLocale: string = defaultLocale) {
+  const locale = normalizeLocale(requestedLocale);
+  const labels = reportLabels[locale];
   const { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
   const tableRows = [
-    new TableRow({ children: [cell("Кадастровий номер", true), cell("Назва / власник", true), cell("Площа, га", true), cell("Категорія", true)] }),
+    new TableRow({ children: [cell(labels.cadastralNumber, true), cell(labels.nameOwner, true), cell(labels.areaHa, true), cell(labels.category, true)] }),
     ...summary.plots.map(({ properties }) => new TableRow({ children: [
-      cell(properties.cadastralNumber), cell(`${properties.name}\n${properties.owner}`), cell(formatArea(properties.areaHa)), cell(summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category),
+      cell(properties.cadastralNumber), cell(`${properties.name}\n${properties.owner}`), cell(formatArea(properties.areaHa, locale)), cell(summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category),
     ] })),
   ];
   const doc = new Document({ sections: [{ properties: {}, children: [
     new Paragraph({ text: "GeoPartners", heading: HeadingLevel.HEADING_2 }),
-    new Paragraph({ text: "Зведений звіт по земельних ділянках", heading: HeadingLevel.TITLE }),
-    new Paragraph({ text: `Сформовано: ${summary.generatedAt.toLocaleString("uk-UA")}` }),
-    new Paragraph({ text: `Ділянок: ${summary.count}. Загальна площа: ${formatArea(summary.totalArea)} га.` }),
-    new Paragraph({ text: "Розподіл за категоріями", heading: HeadingLevel.HEADING_2 }),
-    ...summary.byCategory.map((item) => new Paragraph({ text: `${item.name}: ${item.count} шт., ${formatArea(item.area)} га` })),
-    new Paragraph({ text: "Перелік ділянок", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ text: labels.title, heading: HeadingLevel.TITLE }),
+    new Paragraph({ text: `${labels.generated}: ${summary.generatedAt.toLocaleString(intlLocale(locale))}` }),
+    new Paragraph({ text: `${labels.plots}: ${summary.count}. ${labels.totalArea}: ${formatArea(summary.totalArea, locale)} ${labels.ha}.` }),
+    new Paragraph({ text: labels.byCategory, heading: HeadingLevel.HEADING_2 }),
+    ...summary.byCategory.map((item) => new Paragraph({ text: `${item.name}: ${item.count} ${labels.pieces}, ${formatArea(item.area, locale)} ${labels.ha}` })),
+    new Paragraph({ text: labels.plotList, heading: HeadingLevel.HEADING_2 }),
     new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }),
   ] }] });
   const blob = await Packer.toBlob(doc);
@@ -92,5 +97,19 @@ export function printReport() {
 function metric(label: string, value: string): Content {
   return { stack: [{ text: value, bold: true, fontSize: 16, color: "#17231d" }, { text: label, color: "#66756d", margin: [0, 3, 0, 0] }] };
 }
-function formatArea(value: number) { return value.toLocaleString("uk-UA", { maximumFractionDigits: 4 }); }
+function formatArea(value: number, locale: AppLocale) { return value.toLocaleString(intlLocale(locale), { maximumFractionDigits: 4 }); }
 function dateStamp() { return new Date().toISOString().slice(0, 10); }
+
+function normalizeLocale(locale: string): AppLocale {
+  return isAppLocale(locale) ? locale : defaultLocale;
+}
+
+const reportLabels: Record<AppLocale, {
+  summaryReport: string; title: string; generated: string; plots: string; totalArea: string;
+  byCategory: string; category: string; count: string; areaHa: string; plotList: string;
+  cadastralNumber: string; nameOwner: string; area: string; ha: string; pieces: string;
+}> = {
+  uk: { summaryReport: "зведений звіт", title: "Зведений звіт по земельних ділянках", generated: "Сформовано", plots: "Ділянок", totalArea: "Загальна площа", byCategory: "Розподіл за категоріями", category: "Категорія", count: "Кількість", areaHa: "Площа, га", plotList: "Перелік ділянок", cadastralNumber: "Кадастровий номер", nameOwner: "Назва / власник", area: "Площа", ha: "га", pieces: "шт." },
+  de: { summaryReport: "Zusammenfassung", title: "Zusammenfassung der Grundstücke", generated: "Erstellt", plots: "Flächen", totalArea: "Gesamtfläche", byCategory: "Verteilung nach Kategorien", category: "Kategorie", count: "Anzahl", areaHa: "Fläche, ha", plotList: "Flächenliste", cadastralNumber: "Katasternummer", nameOwner: "Name / Eigentümer", area: "Fläche", ha: "ha", pieces: "Stk." },
+  en: { summaryReport: "summary report", title: "Land plot summary report", generated: "Generated", plots: "Plots", totalArea: "Total area", byCategory: "Distribution by category", category: "Category", count: "Count", areaHa: "Area, ha", plotList: "Plot list", cadastralNumber: "Cadastral number", nameOwner: "Name / owner", area: "Area", ha: "ha", pieces: "pcs." },
+};
