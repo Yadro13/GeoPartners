@@ -1,4 +1,5 @@
 import type { FeatureCollection, Polygon } from "geojson";
+import type { PlotStatusProgress } from "@/lib/plot-status-progress";
 
 export type PlotProperties = {
   id: string;
@@ -11,6 +12,7 @@ export type PlotProperties = {
   owner: string;
   lessee: string;
   status?: string;
+  statusProgress?: PlotStatusProgress[];
   sourceFilename?: string;
   documentName?: string;
   documentUrl?: string;
@@ -67,6 +69,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         owner: "Демо-власник",
         lessee: "Демо-орендар",
         status: "обрана ділянка як варіант",
+        statusProgress: [{ statusId: "status_01", completedAt: "2026-07-22T09:30:00.000Z", cost: null }],
       },
     },
     {

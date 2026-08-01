@@ -241,7 +241,7 @@ async function registrationFor(email) {
   return result.rows[0] ?? null;
 }
 
-function testPlot(name = "Staging E2E plot", status = "обрана ділянка як варіант") {
+function testPlot(name = "Staging E2E plot", status = "обрана ділянка як варіант", statusProgress) {
   return {
     type: "Feature",
     geometry: {
@@ -259,6 +259,7 @@ function testPlot(name = "Staging E2E plot", status = "обрана ділянк
       owner: "E2E",
       lessee: "",
       status,
+      ...(statusProgress ? { statusProgress } : {}),
       sourceFilename: `staging-e2e-${runId}`,
     },
   };
@@ -382,14 +383,25 @@ async function run() {
   assert(statusCatalog.payload[0]?.name === "обрана ділянка як варіант", "Initial plot status order is invalid.");
   await request("/api/plot-statuses", { method: "PUT", jar: userJar, expected: [403], json: statusCatalog.payload });
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: statusName }] });
-  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Status assigned by E2E editor", statusName) });
+  const completedAt = "2026-07-25T11:30:00.000Z";
+  const statusProgress = [
+    { statusId: statusCatalog.payload[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 0 },
+    { statusId, completedAt, cost: 1250.5 },
+  ];
+  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Stages assigned by E2E editor", statusName, statusProgress) });
+  const stagedPlot = await request("/api/plots", { jar: userJar });
+  const stagedProperties = stagedPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(stagedProperties?.statusProgress?.length === 2, "Editor cannot save independently completed plot stages.");
+  assert(stagedProperties.statusProgress[1]?.completedAt === completedAt && stagedProperties.statusProgress[1]?.cost === 1250.5, "Plot stage datetime or expense was not persisted.");
   const renamedStatus = `${statusName} renamed`;
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: renamedStatus }] });
   const renamedPlot = await request("/api/plots", { jar: userJar });
   assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === renamedStatus, "Status rename was not propagated to the plot.");
+  assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress?.some((item) => item.statusId === statusId), "Status rename removed plot stage progress.");
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: statusCatalog.payload });
   const clearedPlot = await request("/api/plots", { jar: userJar });
   assert(clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === "", "Deleted status was not cleared from the plot.");
+  assert(!clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress?.some((item) => item.statusId === statusId), "Deleted status was not removed from plot stage progress.");
   const categoryRows = await client.query("select id, name, description, color, visible from category where workspace = 'sandbox' order by id");
   const categoryCatalog = Object.fromEntries(categoryRows.rows.map((item) => [item.id, { name: item.name, description: item.description, color: item.color, visible: item.visible }]));
   await request("/api/categories", {

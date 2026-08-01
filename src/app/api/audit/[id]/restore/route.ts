@@ -8,7 +8,7 @@ import { auditValues, changedPlotFields, parseVersionSnapshot, versionSnapshot }
 import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/plots";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
-import { getPlotStatuses } from "@/lib/plot-status-directory";
+import { resolvePlotStatusProgress } from "@/lib/plot-status-directory";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const currentUser = await getCurrentUser();
@@ -22,8 +22,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!record) return NextResponse.json({ error: "Версію для відновлення не знайдено." }, { status: 404 });
 
     const stored = parseVersionSnapshot(record.version.snapshot); const feature = parsePlotFeature(stored.feature);
-    const knownStatuses = new Set((await getPlotStatuses(workspace)).map(({ name }) => name));
-    if (feature.properties.status && !knownStatuses.has(feature.properties.status)) feature.properties.status = "";
+    const statusState = await resolvePlotStatusProgress(workspace, feature.properties.statusProgress ?? [], feature.properties.status ?? "", record.version.createdAt);
+    feature.properties.statusProgress = statusState.progress;
+    feature.properties.status = statusState.currentStatus;
     if (feature.properties.id !== record.version.plotId) throw new Error("ID ділянки у версії не збігається.");
     const rows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const current = rows.find((row) => row.id === feature.properties.id);
     const duplicate = rows.find((row) => row.id !== feature.properties.id && row.cadastralNumber === feature.properties.cadastralNumber);

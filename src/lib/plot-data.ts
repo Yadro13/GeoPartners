@@ -2,6 +2,7 @@ import type { FeatureCollection, Geometry, Polygon } from "geojson";
 import { defaultCategories, type CategoryDefinition, type PlotProperties } from "@/data/demo";
 import type { PlotFeature } from "@/components/workspace/types";
 import { calculatePolygonAreaHa } from "@/lib/geometry";
+import { parsePlotStatusProgress, totalPlotStatusCost } from "@/lib/plot-status-progress";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -67,6 +68,7 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
         owner: textValue(properties.owner),
         lessee: textValue(properties.lessee),
         status: textValue(properties.status),
+        statusProgress: parsePlotStatusProgress(properties.statusProgress ?? properties.status_progress),
         sourceFilename: textValue(properties.sourceFilename) || sourceStem,
       },
     };
@@ -125,8 +127,8 @@ export function downloadText(content: string, filename: string, type: string) {
 
 export function plotsToCsv(plots: PlotFeature[]) {
   const rows = [
-    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Статус"],
-    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, properties.status ?? ""]),
+    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пройдені етапи", "Загальні витрати, грн"],
+    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, properties.statusProgress?.length ?? 0, totalPlotStatusCost(properties.statusProgress)]),
   ];
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
 }

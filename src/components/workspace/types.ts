@@ -16,6 +16,7 @@ export type WorkspaceActions = {
   setSection: (section: WorkspaceSection) => void;
   openAdd: () => void;
   openEdit: (plot: PlotFeature) => void;
+  openStages: (plot: PlotFeature) => void;
   remove: (plot: PlotFeature) => void;
   openImport: () => void;
   openDocuments: (plot: PlotFeature) => void;

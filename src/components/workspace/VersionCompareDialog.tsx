@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, RotateCcw } from "lucide-react
 import { MapCanvas } from "@/components/map/MapCanvas";
 import { WorkspaceModal } from "@/components/workspace/WorkspaceModal";
 import { calculatePolygonAreaHa } from "@/lib/geometry";
+import { totalPlotStatusCost } from "@/lib/plot-status-progress";
 import type { VersionComparison } from "@/lib/audit";
 import type { BaseMapId, PlotFeature } from "./types";
 
@@ -28,7 +29,7 @@ function compareFields(current: PlotFeature | null, target: PlotFeature) {
     ["Площа", current ? `${current.properties.areaHa.toLocaleString("uk-UA")} га` : null, `${target.properties.areaHa.toLocaleString("uk-UA")} га`],
     ["Площа за контуром", current ? `${calculatePolygonAreaHa(current.geometry).toLocaleString("uk-UA")} га` : null, `${calculatePolygonAreaHa(target.geometry).toLocaleString("uk-UA")} га`],
     ["Проєктна потужність", current?.properties.projectCapacity, target.properties.projectCapacity],
-    ["Статус", current?.properties.status, target.properties.status],
+    ["Етапи та витрати", current ? stageSummary(current) : null, stageSummary(target)],
     ["Основний кандидат", current?.properties.mainCandidateCadastral, target.properties.mainCandidateCadastral],
     ["Власник", current?.properties.owner, target.properties.owner],
     ["Орендар", current?.properties.lessee, target.properties.lessee],
@@ -39,5 +40,6 @@ function compareFields(current: PlotFeature | null, target: PlotFeature) {
 }
 
 function coordinateCount(plot: PlotFeature) { return plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0); }
+function stageSummary(plot: PlotFeature) { const entries = plot.properties.statusProgress ?? []; return `${entries.length} пройдено, ${totalPlotStatusCost(entries).toLocaleString("uk-UA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} грн`; }
 function normalize(value: unknown) { return value === null || value === undefined ? "" : String(value); }
 function display(value: unknown) { const text = normalize(value).trim(); return text || "Не визначено"; }

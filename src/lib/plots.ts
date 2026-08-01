@@ -2,6 +2,7 @@ import type { CategoryDefinition } from "@/data/demo";
 import type { PlotFeature } from "@/components/workspace/types";
 import type { category, plot } from "@/db/schema";
 import { validatePolygonGeometry } from "@/lib/geometry";
+import { parsePlotStatusProgress } from "@/lib/plot-status-progress";
 
 type PlotRow = typeof plot.$inferSelect;
 type CategoryRow = typeof category.$inferSelect;
@@ -9,7 +10,7 @@ type CategoryRow = typeof category.$inferSelect;
 export function plotRowToFeature(row: PlotRow): PlotFeature {
   return { type: "Feature", geometry: row.geometry, properties: {
     id: row.id, cadastralNumber: row.cadastralNumber, name: row.name, category: row.categoryId ?? "default",
-    areaHa: Number(row.areaHa), projectCapacity: Number(row.projectCapacity), status: row.status,
+    areaHa: Number(row.areaHa), projectCapacity: Number(row.projectCapacity), status: row.status, statusProgress: parsePlotStatusProgress(row.statusProgress),
     mainCandidateCadastral: row.mainCandidateCadastral, owner: row.owner, lessee: row.lessee,
     sourceFilename: row.sourceFilename ?? undefined, documentName: row.pdfObjectKey?.split("/").at(-1),
     documentUrl: row.pdfObjectKey ? `/api/plots/${encodeURIComponent(row.id)}/document` : undefined,
@@ -27,7 +28,7 @@ export function featureToPlotValues(feature: PlotFeature) {
     id: properties.id, cadastralNumber: properties.cadastralNumber, name: properties.name,
     categoryId: properties.category || "default", geometry: feature.geometry,
     areaHa: String(properties.areaHa || 0), projectCapacity: String(properties.projectCapacity || 0),
-    status: properties.status ?? "", mainCandidateCadastral: properties.mainCandidateCadastral ?? "",
+    status: properties.status ?? "", statusProgress: parsePlotStatusProgress(properties.statusProgress), mainCandidateCadastral: properties.mainCandidateCadastral ?? "",
     owner: properties.owner ?? "", lessee: properties.lessee ?? "", sourceFilename: properties.sourceFilename ?? null,
   };
 }
@@ -40,5 +41,5 @@ export function parsePlotFeature(value: unknown): PlotFeature {
   if (!properties.id || !properties.cadastralNumber) throw new Error("ID та кадастровий номер обов'язкові.");
   const geometryErrors = validatePolygonGeometry(feature.geometry).issues.filter(({ level }) => level === "error");
   if (geometryErrors.length) throw new Error(`Некоректна геометрія: ${geometryErrors.map(({ message }) => message).join(" ")}`);
-  return feature as PlotFeature;
+  return { ...feature, properties: { ...properties, statusProgress: parsePlotStatusProgress(properties.statusProgress) } } as PlotFeature;
 }

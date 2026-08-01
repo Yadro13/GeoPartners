@@ -2499,6 +2499,164 @@
   margin-top: 18px;
 }
 
+.plot-details__stages {
+  grid-column: 1 / -1;
+}
+
+.plot-stages {
+  min-width: 0;
+}
+
+.plot-stages__summary {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+}
+
+.plot-stages__summary span {
+  align-items: center;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.plot-stages__summary strong {
+  font-size: 16px;
+}
+
+.plot-stages__list {
+  border: 1px solid var(--line);
+}
+
+.plot-stage-row {
+  border-left: 3px solid transparent;
+  padding: 12px 13px;
+}
+
+.plot-stage-row + .plot-stage-row {
+  border-top: 1px solid var(--line);
+}
+
+.plot-stage-row[data-completed="true"] {
+  background: #f4f8f5;
+  border-left-color: var(--green);
+}
+
+.plot-stage-row__check {
+  align-items: center;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  font-size: 12px;
+  gap: 9px;
+  grid-template-columns: 20px 26px minmax(0, 1fr);
+  line-height: 1.4;
+}
+
+.plot-stage-row__check input {
+  accent-color: var(--green);
+  height: 18px;
+  margin: 0;
+  width: 18px;
+}
+
+.plot-stage-row__check input:disabled {
+  opacity: 0.72;
+}
+
+.plot-stage-row__number {
+  align-items: center;
+  background: #e7ece8;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.plot-stage-row__fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  margin: 11px 0 0 55px;
+}
+
+.plot-stage-row__fields label {
+  color: var(--muted);
+  display: grid;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 5px;
+}
+
+.plot-stage-row__fields label > span {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.plot-stage-row__fields input {
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  min-height: 40px;
+  min-width: 0;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.plot-stage-row__readout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  margin: 10px 0 0 55px;
+}
+
+.plot-stage-row__readout div {
+  min-width: 0;
+}
+
+.plot-stage-row__readout dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.plot-stage-row__readout dd {
+  font-size: 12px;
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 899px) {
+  .plot-stages__summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .plot-stage-row {
+    padding: 12px 10px;
+  }
+
+  .plot-stage-row__fields,
+  .plot-stage-row__readout {
+    grid-template-columns: 1fr;
+    margin-left: 0;
+  }
+
+  .plot-stage-row__check {
+    gap: 7px;
+  }
+}
+
 .command-button {
   align-items: center;
   background: var(--surface);

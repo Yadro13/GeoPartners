@@ -8,7 +8,7 @@ import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/p
 import { auditValues, changedPlotFields } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
-import { assertKnownPlotStatus } from "@/lib/plot-status-directory";
+import { resolvePlotStatusProgress } from "@/lib/plot-status-directory";
 
 export async function GET() {
   const currentUser = await getCurrentUser();
@@ -24,7 +24,9 @@ export async function POST(request: Request) {
   try {
     const workspace = await getDataWorkspace();
     const feature = parsePlotFeature(await request.json());
-    await assertKnownPlotStatus(workspace, feature.properties.status ?? "");
+    const statusState = await resolvePlotStatusProgress(workspace, feature.properties.statusProgress ?? [], feature.properties.status ?? "");
+    feature.properties.statusProgress = statusState.progress;
+    feature.properties.status = statusState.currentStatus;
     const existingRows = await db.select().from(plot).where(eq(plot.workspace, workspace));
     const existing = existingRows.find((row) => row.cadastralNumber === feature.properties.cadastralNumber);
     if (existing) return NextResponse.json({ error: "Ділянка з таким кадастровим номером уже існує." }, { status: 409 });

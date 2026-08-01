@@ -26,23 +26,21 @@ export async function PUT(request: Request) {
     const entries = parsePlotStatusDefinitions(await request.json());
     await db.transaction(async (tx) => {
       const previous = await tx.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder));
-      const nextById = new Map(entries.map((item) => [item.id, item]));
-      const replacements: { temporary: string; name: string }[] = [];
+      const nextIds = new Set(entries.map(({ id }) => id));
 
-      for (const item of previous) {
-        const nextName = nextById.get(item.id)?.name ?? "";
-        if (nextName === item.name) continue;
-        const temporary = `__gp_status_${crypto.randomUUID()}`;
-        await tx.update(plot).set({ status: temporary }).where(and(eq(plot.workspace, workspace), eq(plot.status, item.name)));
-        replacements.push({ temporary, name: nextName });
+      const plots = await tx.select({ id: plot.id, status: plot.status, statusProgress: plot.statusProgress }).from(plot).where(eq(plot.workspace, workspace));
+      for (const item of plots) {
+        const statusProgress = item.statusProgress.filter(({ statusId }) => nextIds.has(statusId));
+        const completedIds = new Set(statusProgress.map(({ statusId }) => statusId));
+        const currentStatus = [...entries].reverse().find(({ id }) => completedIds.has(id))?.name ?? "";
+        if (statusProgress.length !== item.statusProgress.length || currentStatus !== item.status) {
+          await tx.update(plot).set({ status: currentStatus, statusProgress }).where(and(eq(plot.workspace, workspace), eq(plot.id, item.id)));
+        }
       }
 
       await tx.delete(plotStatus).where(eq(plotStatus.workspace, workspace));
       if (entries.length) {
         await tx.insert(plotStatus).values(entries.map((item, sortOrder) => ({ workspace, ...item, sortOrder })));
-      }
-      for (const replacement of replacements) {
-        await tx.update(plot).set({ status: replacement.name }).where(and(eq(plot.workspace, workspace), eq(plot.status, replacement.temporary)));
       }
 
       await tx.insert(auditLog).values(auditValues(currentUser, workspace, {

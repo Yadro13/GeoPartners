@@ -1,8 +1,9 @@
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { plotStatus } from "@/db/schema";
 import type { DataWorkspace } from "@/lib/data-workspace";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
+import type { PlotStatusProgress } from "@/lib/plot-status-progress";
 
 export async function getPlotStatuses(workspace: DataWorkspace): Promise<PlotStatusDefinition[]> {
   const rows = await db
@@ -13,14 +14,19 @@ export async function getPlotStatuses(workspace: DataWorkspace): Promise<PlotSta
   return rows;
 }
 
-export async function assertKnownPlotStatus(workspace: DataWorkspace, name: string) {
-  if (!name) return;
-  const [record] = await db
-    .select({ id: plotStatus.id })
-    .from(plotStatus)
-    .where(and(eq(plotStatus.workspace, workspace), eq(plotStatus.name, name)))
-    .limit(1);
-  if (!record) throw new Error("Оберіть статус із чинного довідника.");
+export async function resolvePlotStatusProgress(workspace: DataWorkspace, progress: PlotStatusProgress[], legacyStatus = "", fallbackDate = new Date()) {
+  const statuses = await getPlotStatuses(workspace);
+  const knownIds = new Set(statuses.map(({ id }) => id));
+  if (progress.some(({ statusId }) => !knownIds.has(statusId))) throw new Error("Оберіть етапи з чинного довідника.");
+  if (progress.length) {
+    const completedIds = new Set(progress.map(({ statusId }) => statusId));
+    return { progress, currentStatus: [...statuses].reverse().find(({ id }) => completedIds.has(id))?.name ?? "" };
+  }
+  if (!legacyStatus) return { progress, currentStatus: "" };
+
+  const legacy = statuses.find(({ name }) => name === legacyStatus);
+  if (!legacy) throw new Error("Оберіть етапи з чинного довідника.");
+  return { progress: [{ statusId: legacy.id, completedAt: fallbackDate.toISOString(), cost: null }], currentStatus: legacy.name };
 }
 
 export function parsePlotStatusDefinitions(value: unknown): PlotStatusDefinition[] {

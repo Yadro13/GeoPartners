@@ -3,6 +3,7 @@ import { coreTables } from "./backup-utils.mjs";
 import { createEmailSender, emailTransportMode } from "../src/lib/email-delivery.mjs";
 import { hasPermission } from "../src/lib/permissions.ts";
 import { defaultPlotStatuses } from "../src/data/plot-statuses.ts";
+import { parsePlotStatusProgress, totalPlotStatusCost } from "../src/lib/plot-status-progress.ts";
 import { structuredLog } from "./structured-log.mjs";
 
 let output = "";
@@ -81,6 +82,20 @@ assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
   "ділянка під ВЕУ викуплена",
 ]);
 
+const normalizedProgress = parsePlotStatusProgress([
+  { statusId: "status_01", completedAt: "2026-07-25T14:30:00+03:00", cost: "1250.505" },
+  { statusId: "status_04", completedAt: "2026-07-26T09:15:00.000Z", cost: null },
+]);
+assert.equal(normalizedProgress[0].completedAt, "2026-07-25T11:30:00.000Z");
+assert.equal(normalizedProgress[0].cost, 1250.51);
+assert.equal(totalPlotStatusCost(normalizedProgress), 1250.51);
+assert.throws(() => parsePlotStatusProgress([
+  { statusId: "status_01", completedAt: "2026-07-25T11:30:00.000Z", cost: 0 },
+  { statusId: "status_01", completedAt: "2026-07-26T11:30:00.000Z", cost: 1 },
+]));
+assert.throws(() => parsePlotStatusProgress([{ statusId: "status_01", completedAt: "invalid", cost: 0 }]));
+assert.throws(() => parsePlotStatusProgress([{ statusId: "status_01", completedAt: "2026-07-25T11:30:00.000Z", cost: -1 }]));
+
 const smtpMessages = [];
 const smtpSender = createEmailSender({
   env: {
@@ -145,7 +160,7 @@ await assert.rejects(
   { code: "BREVO_CONFIG_MISSING" },
 );
 
-console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports", "access-levels", "plot-statuses"] }));
+console.info(JSON.stringify({ status: "ok", checks: ["log-redaction", "backup-tables", "email-transports", "access-levels", "plot-statuses", "plot-status-progress"] }));
 
 function testMessage() {
   return {

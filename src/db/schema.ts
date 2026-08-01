@@ -161,6 +161,7 @@ export const plot = pgTable(
     areaHa: numeric("area_ha", { precision: 14, scale: 4 }).default("0").notNull(),
     projectCapacity: numeric("project_capacity", { precision: 12, scale: 2 }).default("0").notNull(),
     status: text("status").default("").notNull(),
+    statusProgress: jsonb("status_progress").$type<Array<{ statusId: string; completedAt: string; cost: number | null }>>().default([]).notNull(),
     mainCandidateCadastral: text("main_candidate_cadastral").default("").notNull(),
     owner: text("owner").default("").notNull(),
     lessee: text("lessee").default("").notNull(),

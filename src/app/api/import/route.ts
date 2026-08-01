@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, category, plot, plotStatus, plotVersion } from "@/db/schema";
 import { defaultCategories, type CategoryDefinition } from "@/data/demo";
@@ -35,9 +35,10 @@ export async function POST(request: Request) {
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
     serverLog("info", "import.started", { workspace, fileCount: files.length, geoJsonCount: geoFiles.length, pdfCount: pdfFiles.length });
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
-    const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace))]);
+    const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder))]);
     const existingByCadastral = new Map(existingRows.map((row) => [cadastralDigits(row.cadastralNumber), row]));
     const knownStatuses = new Set(statusRows.map(({ name }) => name));
+    const knownStatusIds = new Set(statusRows.map(({ id }) => id));
     const importedCategories: Record<string, CategoryDefinition> = {}; const warnings: string[] = []; const usedPdfs = new Set<string>(); const prepared: PreparedPlot[] = []; const batchCadastrals = new Set<string>();
 
     for (const geoFile of geoFiles) {
@@ -55,11 +56,29 @@ export async function POST(request: Request) {
           warnings.push(`${geoFile.name}: статус «${feature.properties.status}» відсутній у довіднику; ділянку імпортовано без статусу.`);
           feature.properties.status = "";
         }
+        const unknownProgress = (feature.properties.statusProgress ?? []).filter(({ statusId }) => !knownStatusIds.has(statusId));
+        if (unknownProgress.length) {
+          warnings.push(`${geoFile.name}: частина етапів відсутня у довіднику; невідомі етапи пропущено.`);
+          feature.properties.statusProgress = (feature.properties.statusProgress ?? []).filter(({ statusId }) => knownStatusIds.has(statusId));
+        }
+        if (!(feature.properties.statusProgress?.length) && feature.properties.status) {
+          const legacyStatus = statusRows.find(({ name }) => name === feature.properties.status);
+          if (legacyStatus) feature.properties.statusProgress = [{ statusId: legacyStatus.id, completedAt: new Date().toISOString(), cost: null }];
+        }
         const cadastral = cadastralDigits(feature.properties.cadastralNumber);
         if (cadastral.length !== 19) throw new Error(`${geoFile.name}: не вдалося визначити повний кадастровий номер.`);
         if (batchCadastrals.has(cadastral)) throw new Error(`${feature.properties.cadastralNumber}: кадастровий номер повторюється у пакеті.`);
         batchCadastrals.add(cadastral);
-        const existing = existingByCadastral.get(cadastral); if (existing) feature.properties.id = existing.id;
+        const existing = existingByCadastral.get(cadastral);
+        if (existing) {
+          feature.properties.id = existing.id;
+          if (!(feature.properties.statusProgress?.length) && !feature.properties.status) {
+            feature.properties.status = existing.status;
+            feature.properties.statusProgress = existing.statusProgress;
+          }
+        }
+        const completedStatusIds = new Set((feature.properties.statusProgress ?? []).map(({ statusId }) => statusId));
+        feature.properties.status = [...statusRows].reverse().find(({ id }) => completedStatusIds.has(id))?.name ?? "";
         const categoryId = feature.properties.category || "default"; const categoryDefinition = importedCategories[categoryId] ?? defaultCategories[categoryId] ?? { name: categoryId, description: "", color: "#2f86a6", visible: true };
         importedCategories[categoryId] = categoryDefinition;
         prepared.push({ feature, document, existing, category: categoryDefinition, pdfObjectKey: existing?.pdfObjectKey ?? null });
