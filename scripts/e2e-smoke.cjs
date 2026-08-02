@@ -52,6 +52,7 @@ const reportLocales = {
 
   await page.goto(`${baseUrl}?view=users`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  const userManagementBounds = await page.locator(".user-management-page").boundingBox();
   assert((await page.locator(".desktop-rail .rail-button").count()) === 6, "desktop user management uses the complete workspace rail");
   assert((await page.locator('.desktop-rail .rail-button[title="Користувачі"][data-active="true"]').count()) === 1, "user management marks the user section as active");
   assert((await page.getByRole("link", { name: "Історія заявок", exact: true }).count()) === 1, "user registry exposes registration history without an intermediate screen");
@@ -168,6 +169,8 @@ const reportLocales = {
 
   await page.getByTitle("Журнал").click();
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
+  const auditBounds = await page.locator(".audit-page").boundingBox();
+  assert(userManagementBounds && auditBounds && Math.round(auditBounds.width) === Math.round(userManagementBounds.width), "audit log matches the user management workspace width");
   assert((await page.locator(".audit-row").count()) === 4, "desktop audit log renders demo entries");
   await page.getByRole("button", { name: "Імпорти", exact: true }).click();
   await page.getByText("Імпорт завершено: додано 3, оновлено 0.").waitFor();
