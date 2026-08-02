@@ -18,6 +18,7 @@ const appOrigin = new URL(baseUrl).origin;
   page.on("response", (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
 
   await page.goto(`${appOrigin}/sign-in`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Мова інтерфейсу").selectOption("de");
   await page.getByRole("heading", { name: "Anmelden", exact: true }).waitFor();
   assert((await page.getAttribute("html", "lang")) === "de", "German locale updates the document language");
@@ -113,6 +114,7 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=docx");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "desktop status report keeps horizontal scrolling inside the matrix");
   await page.getByRole("button", { name: "Витрати", exact: true }).click();
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити Excel" }).click(), ".xlsx");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-status-report.png"), fullPage: true });
