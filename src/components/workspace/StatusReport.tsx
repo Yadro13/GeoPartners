@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Download, Search } from "lucide-react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import type { CategoryDefinition } from "@/data/demo";
@@ -18,7 +18,7 @@ export function StatusReport({ plots, categories, statuses }: { plots: PlotFeatu
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("all");
   const [statusId, setStatusId] = useState("all");
-  const [mode, setMode] = useState<MatrixMode>("dates");
+  const [mode, setMode] = useState<MatrixMode>("progress");
   const [mobileStatusIndex, setMobileStatusIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -49,7 +49,7 @@ export function StatusReport({ plots, categories, statuses }: { plots: PlotFeatu
     <div className="status-report__result"><strong>{t("resultCount", { count: rows.length })}</strong><span>{t("completedCount", { count: rows.reduce((sum, row) => sum + row.completedCount, 0) })}</span><span>{format.number(rows.reduce((sum, row) => sum + row.totalCost, 0), { style: "currency", currency: "UAH" })}</span></div>
     {rows.length && shownStatuses.length ? <>
       <DesktopMatrix rows={rows} statuses={shownStatuses} mode={mode} />
-      {activeStatus ? <MobileStageReport rows={rows} statuses={statuses} activeIndex={activeStatusIndex} onChange={setMobileStatusIndex} /> : null}
+      {activeStatus ? <MobileStageReport rows={rows} statuses={statuses} activeIndex={activeStatusIndex} mode={mode} onChange={setMobileStatusIndex} onModeChange={setMode} /> : null}
     </> : <div className="status-report__empty">{t("noData")}</div>}
   </section>;
 }
@@ -70,14 +70,41 @@ function StatusCell({ row, statusId, mode }: { row: StatusReportRow; statusId: s
   return <td className="report-matrix__value" data-completed="true"><span className="sr-only">{t("completed")}: </span>{value}</td>;
 }
 
-function MobileStageReport({ rows, statuses, activeIndex, onChange }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; activeIndex: number; onChange: (index: number) => void }) {
+function MobileStageReport({ rows, statuses, activeIndex, mode, onChange, onModeChange }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; activeIndex: number; mode: MatrixMode; onChange: (index: number) => void; onModeChange: (mode: MatrixMode) => void }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const status = statuses[activeIndex];
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const previous = () => onChange((activeIndex - 1 + statuses.length) % statuses.length);
   const next = () => onChange((activeIndex + 1) % statuses.length);
-  return <div className="mobile-stage-report"><div className="mobile-stage-report__nav"><button className="icon-button" type="button" onClick={previous} aria-label={t("previousStage")}><ArrowLeft size={19} /></button><label><span>{t("stageOf", { current: activeIndex + 1, total: statuses.length })}</span><select value={activeIndex} onChange={(event) => onChange(Number(event.target.value))}>{statuses.map((item, index) => <option key={item.id} value={index}>{index + 1}. {item.name}</option>)}</select></label><button className="icon-button" type="button" onClick={next} aria-label={t("nextStage")}><ArrowRight size={19} /></button></div><div className="mobile-stage-report__summary"><strong>{status.name}</strong><span>{t("stageCompletedBy", { completed: rows.filter((row) => row.progress.has(status.id)).length, total: rows.length })}</span></div><div className="mobile-stage-report__list">{rows.map((row) => {
-    const entry = row.progress.get(status.id);
-    return <article data-completed={Boolean(entry)} key={row.plot.properties.id}><div className="mobile-stage-report__plot"><span className="category-line__swatch" style={{ background: row.category.color }} /><span><strong>{row.plot.properties.cadastralNumber}</strong><small>{row.plot.properties.name || row.category.name}</small></span></div>{entry ? <dl><div><dt>{t("completionDate")}</dt><dd>{format.dateTime(new Date(entry.completedAt), { dateStyle: "medium", timeStyle: "short" })}</dd></div><div><dt>{t("expenses")}</dt><dd>{entry.cost === null ? t("noExpenses") : format.number(entry.cost, { style: "currency", currency: "UAH" })}</dd></div></dl> : <span className="mobile-stage-report__pending">{t("notCompleted")}</span>}</article>;
-  })}</div></div>;
+  const finishSwipe = (x: number, y: number) => {
+    if (!swipeStart.current) return;
+    const deltaX = x - swipeStart.current.x;
+    const deltaY = y - swipeStart.current.y;
+    swipeStart.current = null;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+    if (deltaX < 0) next(); else previous();
+  };
+
+  return <div
+    className="mobile-stage-report"
+    onPointerDown={(event) => { if (event.pointerType === "touch") swipeStart.current = { x: event.clientX, y: event.clientY }; }}
+    onPointerUp={(event) => { if (event.pointerType === "touch") finishSwipe(event.clientX, event.clientY); }}
+    onPointerCancel={() => { swipeStart.current = null; }}
+  >
+    <div className="mobile-stage-report__nav"><button className="icon-button" type="button" onClick={previous} aria-label={t("previousStage")}><ArrowLeft size={19} /></button><label><span>{t("stageOf", { current: activeIndex + 1, total: statuses.length })}</span><select value={activeIndex} onChange={(event) => onChange(Number(event.target.value))}>{statuses.map((item, index) => <option key={item.id} value={index}>{index + 1}. {item.name}</option>)}</select></label><button className="icon-button" type="button" onClick={next} aria-label={t("nextStage")}><ArrowRight size={19} /></button></div>
+    <div className="mobile-stage-report__summary" aria-live="polite"><strong>{status.name}</strong><span>{t("stageCompletedBy", { completed: rows.filter((row) => row.progress.has(status.id)).length, total: rows.length })}</span></div>
+    <fieldset className="mobile-stage-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{(["progress", "dates", "expenses"] as const).map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => onModeChange(value)}>{t(value)}</button>)}</div></fieldset>
+    <div className="mobile-stage-report__list-header"><span>{t("plot")}</span><strong>{t("stageNumber", { number: activeIndex + 1 })}</strong></div>
+    <div className="mobile-stage-report__list">{rows.map((row) => {
+      const entry = row.progress.get(status.id);
+      return <article data-completed={Boolean(entry)} key={row.plot.properties.id}>
+        <div className="mobile-stage-report__plot"><span className="category-line__swatch" style={{ background: row.category.color }} /><span><strong>{row.plot.properties.cadastralNumber}</strong><small>{row.plot.properties.name || row.category.name}</small></span></div>
+        <div className="mobile-stage-report__stage-value" data-completed={Boolean(entry)}>
+          {mode === "progress" ? <><span className="mobile-stage-report__stage-mark" aria-hidden="true">{entry ? <Check size={20} /> : "—"}</span><small>{entry ? t("completed") : t("notCompleted")}</small></> : mode === "dates" ? <span className="mobile-stage-report__stage-detail">{entry ? format.dateTime(new Date(entry.completedAt), { dateStyle: "short", timeStyle: "short" }) : "—"}</span> : <span className="mobile-stage-report__stage-detail">{entry ? entry.cost === null ? t("noExpenses") : format.number(entry.cost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 }) : "—"}</span>}
+          <span className="sr-only">{entry ? t("completed") : t("notCompleted")}</span>
+        </div>
+      </article>;
+    })}</div>
+  </div>;
 }

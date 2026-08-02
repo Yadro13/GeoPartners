@@ -585,6 +585,7 @@
     "previousStage": "Vorherige Phase",
     "nextStage": "Nächste Phase",
     "stageOf": "Phase {current} von {total}",
+    "stageNumber": "Phase {number}",
     "stageCompletedBy": "Für {completed} von {total} Grundstücken abgeschlossen",
     "completionDate": "Abschlussdatum"
   },

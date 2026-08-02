@@ -585,6 +585,7 @@
     "previousStage": "Previous stage",
     "nextStage": "Next stage",
     "stageOf": "Stage {current} of {total}",
+    "stageNumber": "Stage {number}",
     "stageCompletedBy": "Completed for {completed} of {total} plots",
     "completionDate": "Completion date"
   },

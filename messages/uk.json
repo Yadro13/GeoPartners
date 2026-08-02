@@ -585,6 +585,7 @@
     "previousStage": "Попередній етап",
     "nextStage": "Наступний етап",
     "stageOf": "Етап {current} із {total}",
+    "stageNumber": "Етап {number}",
     "stageCompletedBy": "Пройдено для {completed} із {total} ділянок",
     "completionDate": "Дата проходження"
   },
