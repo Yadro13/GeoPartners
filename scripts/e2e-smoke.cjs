@@ -143,6 +143,10 @@ const reportLocales = {
   console.log("stage=xlsx-save-block");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
+  await page.setViewportSize({ width: 1920, height: 900 });
+  const matrixHeaderBounds = await page.locator(".report-matrix thead").boundingBox();
+  assert(matrixHeaderBounds && matrixHeaderBounds.height < 110, "desktop status matrix header uses its content height without excess top space");
+  await page.setViewportSize({ width: 1440, height: 900 });
   assert(await page.locator(".report-matrix tbody .report-matrix__category").first().evaluate((element) => getComputedStyle(element).display === "table-cell"), "category values preserve table-cell layout");
   assert((await page.locator(".report-matrix tbody .report-matrix__category-content .category-line__swatch").count()) === 3, "category values render their color markers");
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "desktop status report keeps horizontal scrolling inside the matrix");
