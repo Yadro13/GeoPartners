@@ -20,11 +20,12 @@ import { PlotStagesForm } from "./PlotStagesForm";
 import { NotificationPanel } from "./NotificationPanel";
 import { LocalePreferenceSync } from "@/components/LocalePreferenceSync";
 import type { BaseMapId, PlotFeature, WorkspaceActions, WorkspaceSection, WorkspaceUser } from "./types";
+import type { ManagedUser } from "@/components/admin/UserManagementTable";
 import "./workspace.css";
 
 type Modal = { type: "add" } | { type: "edit" | "stages" | "documents" | "card"; plot: PlotFeature } | { type: "import" | "notifications" } | null;
 
-export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, initialSection = "map", user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; initialSection?: WorkspaceSection; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
+export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, initialUsers = [], initialSection = "map", user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; initialUsers?: ManagedUser[]; initialSection?: WorkspaceSection; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
   const t = useTranslations("workspace");
   const isMobile = useMediaQuery("(max-width: 899px), (pointer: coarse) and (max-width: 1100px)");
   const [previewSnapshot] = useState(() => readPreviewSnapshot(preview));
@@ -247,7 +248,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
 
   if (isMobile === null) return <main className="workspace-loading" aria-live="polite"><span className="workspace-loading__mark">GP</span><span>{t("preparing")}</span></main>;
 
-  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, plotStatuses, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, actions };
+  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, plotStatuses, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, managedUsers: initialUsers, actions };
 
   return <><LocalePreferenceSync preferredLocale={currentUser.locale} />{isMobile ? <MobileWorkspace {...sharedProps} /> : <DesktopWorkspace {...sharedProps} />}
     {modal?.type === "add" ? <WorkspaceModal title={t("newPlot")} description={t("newPlotDescription")} onClose={() => setModal(null)} wide><PlotForm plot={null} neighbors={plots} categories={categories} baseMap={baseMap} onSave={(plot) => persistPlot(plot)} onCancel={() => setModal(null)} /></WorkspaceModal> : null}

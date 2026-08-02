@@ -3,6 +3,7 @@ import type { PlotProperties } from "@/data/demo";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import type { DataWorkspace } from "@/lib/data-workspace";
+import type { ManagedUser } from "@/components/admin/UserManagementTable";
 
 export type PlotFeature = Feature<Polygon, PlotProperties>;
 
@@ -51,5 +52,6 @@ export type WorkspaceViewProps = {
   workspace: DataWorkspace;
   testWorkspaceEnabled: boolean;
   canEditPlots: boolean;
+  managedUsers: ManagedUser[];
   actions: WorkspaceActions;
 };

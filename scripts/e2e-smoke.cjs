@@ -52,8 +52,8 @@ const reportLocales = {
 
   await page.goto(`${baseUrl}?view=users`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
-  assert((await page.locator(".admin-rail .admin-rail__link").count()) === 6, "desktop user management preserves the complete application rail");
-  assert((await page.locator('.admin-rail a[href="/admin/users"][aria-current="page"]').count()) === 1, "user management marks the user section as active");
+  assert((await page.locator(".desktop-rail .rail-button").count()) === 6, "desktop user management uses the complete workspace rail");
+  assert((await page.locator('.desktop-rail .rail-button[title="Користувачі"][data-active="true"]').count()) === 1, "user management marks the user section as active");
   assert((await page.getByRole("link", { name: "Історія заявок", exact: true }).count()) === 1, "user registry exposes registration history without an intermediate screen");
   assert(await page.getByRole("combobox", { name: "Роль tester@example.com" }).isEnabled(), "pending applicant role is editable");
   assert(await page.getByRole("combobox", { name: "Рівень доступу tester@example.com" }).isEnabled(), "pending applicant access is editable");
@@ -61,11 +61,23 @@ const reportLocales = {
   assert(await page.getByRole("button", { name: "Зберегти tester@example.com" }).isEnabled(), "pending applicant settings can be saved");
   assert((await page.getByRole("link", { name: "Розглянути заявку tester@example.com" }).count()) === 1, "pending applicant exposes the review action");
   assert(await page.getByRole("combobox", { name: "Роль admin@example.com" }).isDisabled(), "protected administrator remains locked");
+  const usersUrl = page.url();
+  await page.getByTitle("Карта").click();
+  await page.locator(".desktop-map").waitFor();
+  await page.getByTitle("Користувачі").click();
+  await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert(page.url() === usersUrl, "user management switches inside the current workspace without navigation");
+  await page.getByTitle("Профіль").click();
+  await page.getByRole("heading", { name: "Профіль", exact: true }).waitFor();
+  await page.getByRole("link", { name: "Користувачі", exact: true }).click();
+  await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert(page.url() === usersUrl, "profile opens user management inside the current workspace");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-user-management.png") });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
-  assert(await page.locator(".admin-rail").evaluate((element) => getComputedStyle(element).display === "none"), "mobile user management hides the desktop rail");
+  await page.locator(".mobile-shell").waitFor();
+  assert((await page.locator('.mobile-nav button[data-active="true"]').count()) === 1, "mobile user management keeps the workspace navigation active");
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile user management has no horizontal overflow");
   assert((await page.locator(".user-actions").first().getByRole("button").count()) === 1, "mobile pending applicant keeps save action");
   assert((await page.locator(".user-actions").first().getByRole("link").count()) === 1, "mobile pending applicant keeps review action");
@@ -91,7 +103,7 @@ const reportLocales = {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".leaflet-overlay-pane path");
   assert((await page.locator(".leaflet-overlay-pane path").count()) === 3, "desktop map renders three plots");
-  assert((await page.locator('.desktop-rail a[href="/admin/users"]').count()) === 1, "administrator navigation opens user management directly");
+  assert((await page.locator('.desktop-rail button[title="Користувачі"]').count()) === 1, "administrator navigation exposes user management as a workspace section");
   console.log("stage=map");
   await page.getByTitle("Сповіщення").click();
   await page.getByText("Черга сповіщень працює штатно", { exact: true }).waitFor();

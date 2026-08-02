@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ClipboardCheck, Save } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
-type ManagedUser = { id: string; name: string; email: string; role: "user" | "admin"; accessLevel: "read" | "edit"; approvalStatus: "pending" | "approved" | "rejected" | "suspended"; registrationMethod: "password" | "google"; registrationRequestId: string | null; createdAt: string; protected: boolean };
+export type ManagedUser = { id: string; name: string; email: string; role: "user" | "admin"; accessLevel: "read" | "edit"; approvalStatus: "pending" | "approved" | "rejected" | "suspended"; registrationMethod: "password" | "google"; registrationRequestId: string | null; createdAt: string; protected: boolean };
 
 export function UserManagementTable({ initialUsers }: { initialUsers: ManagedUser[] }) {
   const t = useTranslations("admin");
