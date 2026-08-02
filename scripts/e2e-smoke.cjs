@@ -112,6 +112,8 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=pdf");
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx");
   console.log("stage=docx");
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx");
+  console.log("stage=xlsx-save-block");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "desktop status report keeps horizontal scrolling inside the matrix");
