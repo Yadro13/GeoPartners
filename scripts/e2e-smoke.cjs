@@ -59,6 +59,9 @@ const reportLocales = {
   assert(await page.getByRole("combobox", { name: "Роль tester@example.com" }).isEnabled(), "pending applicant role is editable");
   assert(await page.getByRole("combobox", { name: "Рівень доступу tester@example.com" }).isEnabled(), "pending applicant access is editable");
   assert(await page.getByRole("combobox", { name: "Статус tester@example.com" }).isDisabled(), "pending applicant decision stays protected");
+  const userSelectTypography = await page.getByRole("combobox", { name: "Роль tester@example.com" }).evaluate((element) => { const style = getComputedStyle(element); return { family: style.fontFamily, size: style.fontSize }; });
+  const userMetaTypography = await page.locator(".user-meta span").first().evaluate((element) => { const style = getComputedStyle(element); return { family: style.fontFamily, size: style.fontSize }; });
+  assert(userSelectTypography.family === userMetaTypography.family && userSelectTypography.size === userMetaTypography.size, "user dropdown typography matches the surrounding table text");
   assert(await page.getByRole("button", { name: "Зберегти tester@example.com" }).isEnabled(), "pending applicant settings can be saved");
   assert((await page.getByRole("link", { name: "Розглянути заявку tester@example.com" }).count()) === 1, "pending applicant exposes the review action");
   assert(await page.getByRole("combobox", { name: "Роль admin@example.com" }).isDisabled(), "protected administrator remains locked");
