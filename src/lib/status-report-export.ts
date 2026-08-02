@@ -38,7 +38,7 @@ export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: 
   workbook.subject = labels.title;
 
   createMatrixSheet(workbook, rows, statuses, locale, labels);
-  createDetailsSheet(workbook, rows, statuses, labels);
+  createDetailsSheet(workbook, rows, statuses, labels, locale);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -54,6 +54,7 @@ type Workbook = InstanceType<(typeof import("exceljs"))["Workbook"]>;
 type Labels = (typeof xlsxLabels)[AppLocale];
 
 function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], locale: AppLocale, labels: Labels) {
+  const dateFormat = xlsxDateFormat(locale);
   const sheet = workbook.addWorksheet(labels.matrixSheet, {
     views: [{ state: "frozen", xSplit: 5, ySplit: 4, topLeftCell: "F5", activeCell: "F5" }],
     pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -94,7 +95,7 @@ function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses
     row.getCell(5).numFmt = '#,##0.00 "UAH"';
     statuses.forEach((_, statusIndex) => {
       const cell = row.getCell(6 + statusIndex);
-      cell.numFmt = "yyyy-mm-dd";
+      cell.numFmt = dateFormat.date;
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       if (cell.value) cell.fill = solidFill("FFE7F3EB");
     });
@@ -123,7 +124,8 @@ function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses
   }));
 }
 
-function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], labels: Labels) {
+function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], labels: Labels, locale: AppLocale) {
+  const dateFormat = xlsxDateFormat(locale);
   const sheet = workbook.addWorksheet(labels.detailsSheet, { views: [{ state: "frozen", ySplit: 1 }] });
   sheet.columns = [
     { header: labels.plot, key: "plot", width: 28 },
@@ -151,7 +153,7 @@ function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuse
       cost: entry?.cost ?? null,
     });
     row.alignment = { vertical: "middle", wrapText: true };
-    row.getCell(7).numFmt = "yyyy-mm-dd hh:mm";
+    row.getCell(7).numFmt = dateFormat.dateTime;
     row.getCell(8).numFmt = '#,##0.00 "UAH"';
     if (entry) row.getCell(6).fill = solidFill("FFE7F3EB");
   }));
@@ -159,7 +161,7 @@ function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuse
   sheet.eachRow((row) => row.eachCell({ includeEmpty: true }, (cell) => { cell.border = thinBorder(); }));
   sheet.getCell("J1").value = labels.generated;
   sheet.getCell("J2").value = new Date();
-  sheet.getCell("J2").numFmt = "yyyy-mm-dd hh:mm";
+  sheet.getCell("J2").numFmt = dateFormat.dateTime;
   sheet.getCell("J4").value = labels.currencyNote;
   sheet.getCell("J4").alignment = { wrapText: true };
   sheet.getColumn("J").width = 28;
@@ -191,6 +193,12 @@ function columnLetter(column: number) {
     value = Math.floor(value / 26);
   }
   return result;
+}
+
+function xlsxDateFormat(locale: AppLocale) {
+  return locale === "en"
+    ? { date: "mm/dd/yyyy", dateTime: "mm/dd/yyyy hh:mm" }
+    : { date: "dd.mm.yyyy", dateTime: "dd.mm.yyyy hh:mm" };
 }
 
 const xlsxLabels = {

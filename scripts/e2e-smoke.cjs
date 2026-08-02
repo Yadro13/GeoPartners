@@ -1,12 +1,17 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("playwright");
-const { zipSync } = require("fflate");
+const { unzipSync, zipSync } = require("fflate");
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
 
 const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 const appOrigin = new URL(baseUrl).origin;
+const reportLocales = {
+  uk: { heading: "Матриця проходження етапів", xlsxButton: "Завантажити XLSX", pdfButton: "Завантажити PDF", docxButton: "Завантажити DOCX", printButton: "Друкувати", fileTitle: "Зведений звіт по земельних ділянках", xlsxTitle: "Звіт про проходження етапів земельних ділянок", matrixSheet: "Матриця етапів", detailsSheet: "Деталі", dateFormat: "dd.mm.yyyy" },
+  de: { heading: "Matrix des Phasenfortschritts", xlsxButton: "XLSX herunterladen", pdfButton: "PDF herunterladen", docxButton: "DOCX herunterladen", printButton: "Drucken", fileTitle: "Zusammenfassung der Grundstücke", xlsxTitle: "Bericht zum Fortschritt der Grundstücksphasen", matrixSheet: "Phasenmatrix", detailsSheet: "Details", dateFormat: "dd.mm.yyyy" },
+  en: { heading: "Stage progress matrix", xlsxButton: "Download XLSX", pdfButton: "Download PDF", docxButton: "Download DOCX", printButton: "Print", fileTitle: "Land plot summary report", xlsxTitle: "Land plot stage progress report", matrixSheet: "Stage matrix", detailsSheet: "Details", dateFormat: "mm/dd/yyyy" },
+};
 
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH });
@@ -110,11 +115,11 @@ const appOrigin = new URL(baseUrl).origin;
   await page.getByRole("heading", { name: "Зведений звіт" }).waitFor();
   await expectDownload(page, () => page.getByRole("button", { name: "CSV" }).click(), ".csv");
   console.log("stage=csv");
-  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf");
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf", reportLocales.uk);
   console.log("stage=pdf");
-  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx");
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx", reportLocales.uk);
   console.log("stage=docx");
-  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx");
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", reportLocales.uk);
   console.log("stage=xlsx-save-block");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
@@ -127,9 +132,23 @@ const appOrigin = new URL(baseUrl).origin;
   const changedReportModeBounds = await page.locator(".status-report__mode .segmented-control").boundingBox();
   assert(reportModeBounds && changedReportModeBounds && reportModeBounds.x === changedReportModeBounds.x && reportModeBounds.width === changedReportModeBounds.width, "report mode controls stay fixed when the active mode changes");
   await page.getByRole("button", { name: "Витрати", exact: true }).click();
-  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити Excel" }).click(), ".xlsx");
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити Excel" }).click(), ".xlsx", reportLocales.uk);
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-status-report.png"), fullPage: true });
   console.log("stage=xlsx");
+
+  await verifyPrintReport(page, reportLocales.uk);
+  for (const locale of ["de", "en"]) {
+    const expected = reportLocales[locale];
+    await page.locator(".language-switcher select").selectOption(locale);
+    await page.getByRole("heading", { name: expected.heading, exact: true }).waitFor();
+    await expectDownload(page, () => page.getByRole("button", { name: expected.xlsxButton, exact: true }).click(), ".xlsx", expected);
+    await expectDownload(page, () => page.getByRole("button", { name: expected.pdfButton, exact: true }).click(), ".pdf", expected);
+    await expectDownload(page, () => page.getByRole("button", { name: expected.docxButton, exact: true }).click(), ".docx", expected);
+    await verifyPrintReport(page, expected);
+  }
+  await page.locator(".language-switcher select").selectOption("uk");
+  await page.getByRole("heading", { name: reportLocales.uk.heading, exact: true }).waitFor();
+  console.log("stage=localized-reports");
 
   await page.getByTitle("Журнал").click();
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
@@ -570,24 +589,59 @@ const appOrigin = new URL(baseUrl).origin;
   process.exit(1);
 });
 
-async function expectDownload(page, action, extension) {
+async function expectDownload(page, action, extension, expected) {
   const downloadPromise = page.waitForEvent("download", { timeout: 30000 });
   await action();
   const download = await downloadPromise;
   assert(download.suggestedFilename().endsWith(extension), `${extension} download has expected filename`);
-  if (extension === ".xlsx") {
-    const target = path.join(os.tmpdir(), `geopartners-status-report-${Date.now()}.xlsx`);
-    await download.saveAs(target);
+  if (!expected && extension !== ".xlsx") return download.cancel();
+  const target = path.join(os.tmpdir(), `geopartners-report-${Date.now()}${extension}`);
+  await download.saveAs(target);
+  try {
+    if (extension === ".xlsx") {
     const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(target);
     assert(workbook.worksheets.length === 2, "Excel report contains matrix and detail sheets");
     assert(workbook.worksheets[0].rowCount >= 8, "Excel matrix contains plot rows and totals");
     assert(workbook.worksheets[1].rowCount >= 46, "Excel detail sheet contains all plot-stage combinations");
+      if (expected) {
+        assert(workbook.worksheets[0].name === expected.matrixSheet, `Excel matrix sheet is localized as ${expected.matrixSheet}`);
+        assert(workbook.worksheets[1].name === expected.detailsSheet, `Excel details sheet is localized as ${expected.detailsSheet}`);
+        assert(workbook.worksheets[0].getCell("A1").value === expected.xlsxTitle, `Excel title is localized as ${expected.xlsxTitle}`);
+        assert(workbook.worksheets[0].getCell("F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
+      }
+    } else if (extension === ".docx") {
+      const archive = unzipSync(new Uint8Array(fs.readFileSync(target)));
+      const documentXml = Buffer.from(archive["word/document.xml"]).toString("utf8");
+      assert(documentXml.includes(expected.fileTitle), `DOCX title is localized as ${expected.fileTitle}`);
+    } else if (extension === ".pdf") {
+      const { PDFParse } = require("pdf-parse");
+      const parser = new PDFParse({ data: new Uint8Array(fs.readFileSync(target)) });
+      try {
+        const result = await parser.getText();
+        assert(result.text.includes(expected.fileTitle), `PDF title is localized as ${expected.fileTitle}`);
+      } finally {
+        await parser.destroy();
+      }
+    }
+  } finally {
     fs.unlinkSync(target);
-  } else {
-    await download.cancel();
   }
+}
+
+async function verifyPrintReport(page, expected) {
+  await page.evaluate(() => {
+    window.__reportPrintCalled = false;
+    window.print = () => { window.__reportPrintCalled = true; };
+  });
+  await page.getByRole("button", { name: expected.printButton, exact: true }).click();
+  assert(await page.evaluate(() => window.__reportPrintCalled === true), `${expected.printButton} invokes browser printing`);
+  await page.emulateMedia({ media: "print" });
+  assert(await page.getByRole("heading", { name: expected.heading, exact: true }).isVisible(), `print report heading is localized as ${expected.heading}`);
+  assert(await page.locator(".report-matrix-wrap").isVisible(), "print report includes the stage matrix");
+  assert(await page.locator(".report-export").evaluate((element) => getComputedStyle(element).display === "none"), "print report hides download controls");
+  await page.emulateMedia({ media: "screen" });
 }
 
 async function drawPolygon(page) {
