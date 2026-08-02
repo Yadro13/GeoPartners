@@ -254,6 +254,8 @@
     "changesSaved": "Änderungen für {email} gespeichert.",
     "saveFailed": "Änderungen konnten nicht gespeichert werden.",
     "accessRequests": "Zugangsanträge",
+    "requestHistory": "Antragsverlauf",
+    "backToUsers": "Zurück zu Benutzern",
     "noRequests": "Es gibt keine neuen Anträge.",
     "pendingShort": "Ausstehend",
     "approved": "Genehmigt",

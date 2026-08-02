@@ -31,7 +31,7 @@ export default async function RegistrationsPage() {
 
 async function AdminHeader() {
   const t = await getTranslations("admin");
-  return <header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><div className="admin-header__actions"><LanguageSwitcher compact /><Link href="/">{t("backToMap")}</Link></div></header>;
+  return <header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><div className="admin-header__actions"><LanguageSwitcher compact /><Link href="/admin/users">{t("backToUsers")}</Link></div></header>;
 }
 
 function statusLabel(status: string, t: (key: "pendingShort" | "approved" | "rejected" | "suspended") => string) {

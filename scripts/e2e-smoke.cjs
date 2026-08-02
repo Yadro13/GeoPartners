@@ -47,6 +47,7 @@ const appOrigin = new URL(baseUrl).origin;
 
   await page.goto(`${baseUrl}?view=users`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert((await page.getByRole("link", { name: "Історія заявок", exact: true }).count()) === 1, "user registry exposes registration history without an intermediate screen");
   assert(await page.getByRole("combobox", { name: "Роль tester@example.com" }).isEnabled(), "pending applicant role is editable");
   assert(await page.getByRole("combobox", { name: "Рівень доступу tester@example.com" }).isEnabled(), "pending applicant access is editable");
   assert(await page.getByRole("combobox", { name: "Статус tester@example.com" }).isDisabled(), "pending applicant decision stays protected");
@@ -81,6 +82,7 @@ const appOrigin = new URL(baseUrl).origin;
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".leaflet-overlay-pane path");
   assert((await page.locator(".leaflet-overlay-pane path").count()) === 3, "desktop map renders three plots");
+  assert((await page.locator('.desktop-rail a[href="/admin/users"]').count()) === 1, "administrator navigation opens user management directly");
   console.log("stage=map");
   await page.getByTitle("Сповіщення").click();
   await page.getByText("Черга сповіщень працює штатно", { exact: true }).waitFor();

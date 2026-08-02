@@ -254,6 +254,8 @@
     "changesSaved": "Changes for {email} saved.",
     "saveFailed": "Could not save changes.",
     "accessRequests": "Access requests",
+    "requestHistory": "Request history",
+    "backToUsers": "Back to users",
     "noRequests": "There are no new requests.",
     "pendingShort": "Pending",
     "approved": "Approved",

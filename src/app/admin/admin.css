@@ -162,6 +162,23 @@
   margin: 4px 0 22px;
 }
 
+.admin-title--actions {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.admin-title--actions h1 {
+  margin-bottom: 0;
+}
+
+.admin-title--actions .command-button {
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
 .request-list {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -381,6 +398,16 @@
 
   .admin-content {
     padding: 22px 14px 36px;
+  }
+
+  .admin-title--actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-title--actions .command-button {
+    justify-content: center;
   }
 
   .request-row {

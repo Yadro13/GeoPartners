@@ -1244,23 +1244,11 @@
   gap: 8px;
 }
 
-.report-export p,
-.access-actions p {
+.report-export p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
   margin: 0 0 8px;
-}
-
-.access-actions {
-  align-items: flex-start;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 520px;
-  padding: 22px;
 }
 
 .empty-state {

@@ -254,6 +254,8 @@
     "changesSaved": "Зміни для {email} збережено.",
     "saveFailed": "Не вдалося зберегти зміни.",
     "accessRequests": "Заявки на доступ",
+    "requestHistory": "Історія заявок",
+    "backToUsers": "До користувачів",
     "noRequests": "Нових заявок немає.",
     "pendingShort": "Очікує",
     "approved": "Підтверджено",

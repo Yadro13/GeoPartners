@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, CircleCheck, Coins, Download, Eye, EyeOff, FileJson, FileSpreadsheet, FileText, KeyRound, Link2, LogOut, Plus, Printer, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleCheck, Coins, Download, Eye, EyeOff, FileJson, FileSpreadsheet, FileText, KeyRound, Link2, LogOut, Plus, Printer, Save, Trash2, UserRound } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
@@ -69,11 +69,6 @@ export function ReportsPanel({ plots, categories, plotStatuses, actions }: { plo
       <aside className="report-export"><h2>{t("saveReport")}</h2><p>{t("reportNote")}</p><button className="command-button command-button--primary" disabled={Boolean(busy) || !statusRows.length} type="button" onClick={() => run("xlsx")}><FileSpreadsheet size={17} />{busy === "xlsx" ? t("generating") : t("downloadXlsx")}</button><button className="command-button" disabled={Boolean(busy)} type="button" onClick={() => run("pdf")}><Download size={17} />{busy === "pdf" ? t("generating") : t("downloadPdf")}</button><button className="command-button" disabled={Boolean(busy)} type="button" onClick={() => run("docx")}><FileText size={17} />{busy === "docx" ? t("generating") : t("downloadDocx")}</button><button className="command-button" type="button" onClick={printReport}><Printer size={17} />{t("print")}</button></aside>
     </div>
   </section>;
-}
-
-export function UsersPanel({ isAdmin }: { isAdmin: boolean }) {
-  const t = useTranslations("panels");
-  return <section className="workspace-page"><header className="workspace-page__header"><div><span className="eyebrow">{t("systemAccess")}</span><h1>{t("users")}</h1></div></header>{isAdmin ? <div className="access-actions"><Link className="command-button command-button--primary" href="/admin/users"><UserRound size={18} />{t("manageUsers")}</Link><Link className="command-button" href="/admin/registrations"><ShieldCheck size={18} />{t("registrationRequests")}</Link><p>{t("userAdminHint")}</p></div> : <div className="empty-state"><ShieldCheck size={26} /><h2>{t("adminSection")}</h2><p>{t("adminOnly")}</p></div>}</section>;
 }
 
 type ProfileMessage = { kind: "success" | "error"; text: string } | null;
