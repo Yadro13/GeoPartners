@@ -24,7 +24,7 @@ import "./workspace.css";
 
 type Modal = { type: "add" } | { type: "edit" | "stages" | "documents" | "card"; plot: PlotFeature } | { type: "import" | "notifications" } | null;
 
-export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
+export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, initialSection = "map", user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; initialSection?: WorkspaceSection; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
   const t = useTranslations("workspace");
   const isMobile = useMediaQuery("(max-width: 899px), (pointer: coarse) and (max-width: 1100px)");
   const [previewSnapshot] = useState(() => readPreviewSnapshot(preview));
@@ -34,7 +34,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   const [plotStatuses, setPlotStatuses] = useState<PlotStatusDefinition[]>(previewSnapshot?.plotStatuses ?? initialPlotStatuses ?? defaultPlotStatuses);
   const [selectedId, setSelectedId] = useState<string | null>(startingPlots[1]?.properties.id ?? startingPlots[0]?.properties.id ?? null);
   const [query, setQuery] = useState("");
-  const [activeSection, setActiveSection] = useState<WorkspaceSection>("map");
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>(initialSection);
   const [baseMap, setBaseMap] = useState<BaseMapId>(previewSnapshot?.baseMap ?? "streets");
   const [modal, setModal] = useState<Modal>(null);
   const [toast, setToast] = useState("");

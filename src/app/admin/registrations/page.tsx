@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { registrationRequest, user } from "@/db/schema";
 import { requireAdmin } from "@/lib/access";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { AdminNavigation } from "@/components/admin/AdminNavigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 import "../admin.css";
 
@@ -21,6 +22,7 @@ export default async function RegistrationsPage() {
   return (
     <main className="admin-shell">
       <AdminHeader />
+      <AdminNavigation />
       <div className="admin-content">
         <div className="admin-title"><span className="eyebrow">{t("administration")}</span><h1>{t("accessRequests")}</h1></div>
         {requests.length ? <div className="request-list">{requests.map(({ request, applicant }) => <Link className="request-row" href={`/admin/registrations/${request.id}`} key={request.id}><div><strong>{applicant.name}</strong><span>{applicant.email}</span></div><time>{format.dateTime(request.submittedAt, { dateStyle: "medium", timeStyle: "short" })}</time><span className="request-badge">{statusLabel(request.status, t)}</span><ChevronRight size={18} /></Link>)}</div> : <div className="admin-empty">{t("noRequests")}</div>}

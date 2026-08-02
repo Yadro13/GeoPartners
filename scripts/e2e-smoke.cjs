@@ -52,6 +52,8 @@ const reportLocales = {
 
   await page.goto(`${baseUrl}?view=users`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert((await page.locator(".admin-rail .admin-rail__link").count()) === 6, "desktop user management preserves the complete application rail");
+  assert((await page.locator('.admin-rail a[href="/admin/users"][aria-current="page"]').count()) === 1, "user management marks the user section as active");
   assert((await page.getByRole("link", { name: "Історія заявок", exact: true }).count()) === 1, "user registry exposes registration history without an intermediate screen");
   assert(await page.getByRole("combobox", { name: "Роль tester@example.com" }).isEnabled(), "pending applicant role is editable");
   assert(await page.getByRole("combobox", { name: "Рівень доступу tester@example.com" }).isEnabled(), "pending applicant access is editable");
@@ -63,6 +65,7 @@ const reportLocales = {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Користувачі", exact: true }).waitFor();
+  assert(await page.locator(".admin-rail").evaluate((element) => getComputedStyle(element).display === "none"), "mobile user management hides the desktop rail");
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "mobile user management has no horizontal overflow");
   assert((await page.locator(".user-actions").first().getByRole("button").count()) === 1, "mobile pending applicant keeps save action");
   assert((await page.locator(".user-actions").first().getByRole("link").count()) === 1, "mobile pending applicant keeps review action");
@@ -72,6 +75,7 @@ const reportLocales = {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${baseUrl}?view=registration-result`, { waitUntil: "domcontentloaded" });
   await page.getByText("Підтверджено", { exact: true }).waitFor();
+  assert((await page.locator(".admin-rail .admin-rail__link").count()) === 6, "desktop registration review preserves the complete application rail");
   await page.getByText("Другий адміністратор", { exact: false }).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-registration-result.png") });
   await page.setViewportSize({ width: 390, height: 844 });

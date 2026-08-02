@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { DecisionForm } from "@/components/admin/DecisionForm";
 import { RegistrationDecisionResult } from "@/components/admin/RegistrationDecisionResult";
+import { AdminNavigation } from "@/components/admin/AdminNavigation";
 import { db } from "@/db";
 import { user } from "@/db/schema";
 import { requireAdmin } from "@/lib/access";
@@ -25,6 +26,7 @@ export default async function RegistrationReviewPage({ params }: { params: Promi
   return (
     <main className="admin-shell">
       <header className="admin-header"><div className="brand-lockup"><span className="brand-mark">GP</span><strong>GeoPartners</strong></div><div className="admin-header__actions"><LanguageSwitcher compact /><Link href="/admin/registrations"><ArrowLeft size={16} />{t("backToRequests")}</Link></div></header>
+      <AdminNavigation />
       <div className="admin-content">
         <div className="admin-title"><span className="eyebrow">{t("requestTitle")}</span><h1>{applicant.name}</h1></div>
         <div className="review-layout">
