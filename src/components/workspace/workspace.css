@@ -1121,10 +1121,16 @@
   z-index: 2;
 }
 
-.report-matrix td.report-matrix__category {
+.report-matrix__category-content {
   align-items: center;
   display: flex;
   gap: 7px;
+  min-width: 0;
+}
+
+.report-matrix__category-content > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .report-matrix__cost {

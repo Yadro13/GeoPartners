@@ -116,6 +116,8 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=xlsx-save-block");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
+  assert(await page.locator(".report-matrix tbody .report-matrix__category").first().evaluate((element) => getComputedStyle(element).display === "table-cell"), "category values preserve table-cell layout");
+  assert((await page.locator(".report-matrix tbody .report-matrix__category-content .category-line__swatch").count()) === 3, "category values render their color markers");
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "desktop status report keeps horizontal scrolling inside the matrix");
   assert(await page.locator(".report-matrix-wrap").evaluate((element) => element.scrollWidth <= element.clientWidth), "desktop status report fits the full matrix without horizontal scrolling");
   const reportModeBounds = await page.locator(".status-report__mode .segmented-control").boundingBox();
