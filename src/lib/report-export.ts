@@ -64,11 +64,14 @@ export async function exportReportPdf(summary: ReportSummary, requestedLocale: s
 export async function exportReportDocx(summary: ReportSummary, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = []) {
   const locale = normalizeLocale(requestedLocale);
   const labels = reportLabels[locale];
-  const { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+  const { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } = await import("docx");
+  const tableWidth = 9020;
+  const plotColumnWidths = [2700, 2700, 1200, 2420] as const;
+  const stageColumnWidths = [5000, 2400, 1620] as const;
   const tableRows = [
-    new TableRow({ children: [cell(labels.cadastralNumber, true), cell(labels.nameOwner, true), cell(labels.areaHa, true), cell(labels.category, true)] }),
+    new TableRow({ children: [cell(labels.cadastralNumber, true, plotColumnWidths[0]), cell(labels.nameOwner, true, plotColumnWidths[1]), cell(labels.areaHa, true, plotColumnWidths[2]), cell(labels.category, true, plotColumnWidths[3])] }),
     ...summary.plots.map(({ properties }) => new TableRow({ children: [
-      cell(properties.cadastralNumber), cell(`${properties.name}\n${properties.owner}`), cell(formatArea(properties.areaHa, locale)), cell(summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category),
+      cell(properties.cadastralNumber, false, plotColumnWidths[0]), cell(`${properties.name}\n${properties.owner}`, false, plotColumnWidths[1]), cell(formatArea(properties.areaHa, locale), false, plotColumnWidths[2]), cell(summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category, false, plotColumnWidths[3]),
     ] })),
   ];
   const doc = new Document({ sections: [{ properties: {}, children: [
@@ -79,18 +82,18 @@ export async function exportReportDocx(summary: ReportSummary, requestedLocale: 
     new Paragraph({ text: labels.byCategory, heading: HeadingLevel.HEADING_2 }),
     ...summary.byCategory.map((item) => new Paragraph({ text: `${item.name}: ${item.count} ${labels.pieces}, ${formatArea(item.area, locale)} ${labels.ha}` })),
     new Paragraph({ text: labels.plotList, heading: HeadingLevel.HEADING_2 }),
-    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }),
+    new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: plotColumnWidths, layout: TableLayoutType.AUTOFIT, rows: tableRows }),
     ...(statuses.length ? [
       new Paragraph({ text: labels.stageProgress, heading: HeadingLevel.HEADING_2 }),
       ...summary.plots.flatMap(({ properties }) => {
         const progress = new Map((properties.statusProgress ?? []).map((entry) => [entry.statusId, entry]));
         return [
           new Paragraph({ text: `${properties.cadastralNumber} · ${properties.name}`, heading: HeadingLevel.HEADING_3 }),
-          new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
-            new TableRow({ children: [cell(labels.stage, true), cell(labels.completionDate, true), cell(labels.expenses, true)] }),
+          new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: stageColumnWidths, layout: TableLayoutType.AUTOFIT, rows: [
+            new TableRow({ children: [cell(labels.stage, true, stageColumnWidths[0]), cell(labels.completionDate, true, stageColumnWidths[1]), cell(labels.expenses, true, stageColumnWidths[2])] }),
             ...statuses.map((status) => {
               const entry = progress.get(status.id);
-              return new TableRow({ children: [cell(status.name), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted), cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale))] });
+              return new TableRow({ children: [cell(status.name, false, stageColumnWidths[0]), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, false, stageColumnWidths[1]), cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale), false, stageColumnWidths[2])] });
             }),
           ] }),
         ];
@@ -105,8 +108,8 @@ export async function exportReportDocx(summary: ReportSummary, requestedLocale: 
   anchor.click();
   URL.revokeObjectURL(url);
 
-  function cell(text: string, bold = false) {
-    return new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  function cell(text: string, bold = false, width?: number) {
+    return new TableCell({ width: width ? { size: width, type: WidthType.DXA } : undefined, children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
   }
 }
 

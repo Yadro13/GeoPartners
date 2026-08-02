@@ -657,6 +657,12 @@ async function expectDownload(page, action, extension, expected) {
       const archive = unzipSync(new Uint8Array(fs.readFileSync(target)));
       const documentXml = Buffer.from(archive["word/document.xml"]).toString("utf8");
       assert(documentXml.includes(expected.fileTitle), `DOCX title is localized as ${expected.fileTitle}`);
+      const tableGrids = [...documentXml.matchAll(/<w:tblGrid>([\s\S]*?)<\/w:tblGrid>/g)].map((match) => [...match[1].matchAll(/<w:gridCol w:w="(\d+)"\s*\/>/g)].map((column) => Number(column[1])));
+      assert(tableGrids.length >= 4, "DOCX contains the plot table and per-plot stage tables");
+      assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= 4, "DOCX tables allow Word to auto-fit preferred widths to their content");
+      assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
+      assert(tableGrids[0][0] >= 2400 && tableGrids[0][1] >= 2400 && tableGrids[0][2] >= 1000, "DOCX plot columns have deliberate readable widths");
+      assert(tableGrids.slice(1).every((widths) => widths.length === 3 && widths[0] >= 4800 && widths[0] > widths[1] && widths[1] > widths[2]), "DOCX stage tables prioritize the stage description column");
     } else if (extension === ".pdf") {
       const { PDFParse } = require("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(fs.readFileSync(target)) });
