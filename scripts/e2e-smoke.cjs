@@ -3,6 +3,7 @@ const { chromium } = require("playwright");
 const { zipSync } = require("fflate");
 const path = require("node:path");
 const os = require("node:os");
+const fs = require("node:fs");
 
 const baseUrl = process.env.BASE_URL || "http://localhost:3000/ui-preview";
 const appOrigin = new URL(baseUrl).origin;
@@ -33,6 +34,9 @@ const appOrigin = new URL(baseUrl).origin;
   await page.waitForSelector(".desktop-shell");
   await page.getByTitle("Ebenen").waitFor();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "German desktop workspace has no horizontal overflow");
+  await page.getByTitle("Berichte").click();
+  await page.getByRole("heading", { name: "Matrix des Phasenfortschritts", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Excel herunterladen", exact: true }).waitFor();
   await page.goto(`${appOrigin}/sign-in`, { waitUntil: "domcontentloaded" });
   await page.getByLabel("Sprache der Benutzeroberfläche").selectOption("en");
   await page.getByRole("heading", { name: "Sign in", exact: true }).waitFor();
@@ -107,6 +111,12 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=pdf");
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx");
   console.log("stage=docx");
+  assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
+  assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
+  await page.getByRole("button", { name: "Витрати", exact: true }).click();
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити Excel" }).click(), ".xlsx");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-status-report.png"), fullPage: true });
+  console.log("stage=xlsx");
 
   await page.getByTitle("Журнал").click();
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
@@ -388,6 +398,12 @@ const appOrigin = new URL(baseUrl).origin;
   await page.getByRole("dialog").getByRole("button", { name: "Закрити" }).click();
   await page.getByRole("button", { name: "Звіти", exact: true }).click();
   await page.getByRole("heading", { name: "Зведений звіт" }).waitFor();
+  assert((await page.locator(".mobile-stage-report__list article").count()) === 4, "mobile status report renders one row per visible plot");
+  await page.getByRole("button", { name: "Наступний етап" }).click();
+  await page.getByText("Етап 2 із 15", { exact: true }).waitFor();
+  const mobileReport = await page.locator(".status-report").evaluate((element) => ({ width: element.scrollWidth, clientWidth: element.clientWidth, viewport: innerWidth }));
+  assert(mobileReport.width === mobileReport.clientWidth && mobileReport.clientWidth <= mobileReport.viewport, "mobile status report has no horizontal overflow");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-status-report.png"), fullPage: true });
   assert((await page.locator(".mobile-nav button").count()) === 5, "mobile navigation exposes the audit tab");
   await page.getByRole("button", { name: "Журнал", exact: true }).click();
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
@@ -534,7 +550,7 @@ const appOrigin = new URL(baseUrl).origin;
   console.log("stage=system-states");
 
   assert(errors.length === 0, `browser console is clean: ${errors.join(" | ")}`);
-  console.log(JSON.stringify({ ok: true, desktopPlots: 4, mobile: dimensions, downloads: ["csv", "pdf", "docx"] }));
+  console.log(JSON.stringify({ ok: true, desktopPlots: 4, mobile: dimensions, downloads: ["csv", "pdf", "docx", "xlsx"] }));
   await browser.close();
 })().catch(async (error) => {
   console.error(error);
@@ -546,7 +562,19 @@ async function expectDownload(page, action, extension) {
   await action();
   const download = await downloadPromise;
   assert(download.suggestedFilename().endsWith(extension), `${extension} download has expected filename`);
-  await download.cancel();
+  if (extension === ".xlsx") {
+    const target = path.join(os.tmpdir(), `geopartners-status-report-${Date.now()}.xlsx`);
+    await download.saveAs(target);
+    const ExcelJS = require("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(target);
+    assert(workbook.worksheets.length === 2, "Excel report contains matrix and detail sheets");
+    assert(workbook.worksheets[0].rowCount >= 8, "Excel matrix contains plot rows and totals");
+    assert(workbook.worksheets[1].rowCount >= 46, "Excel detail sheet contains all plot-stage combinations");
+    fs.unlinkSync(target);
+  } else {
+    await download.cancel();
+  }
 }
 
 async function drawPolygon(page) {

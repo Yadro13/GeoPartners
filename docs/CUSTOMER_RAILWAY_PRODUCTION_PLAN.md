@@ -265,7 +265,7 @@ environment.
 - створення, редагування, видалення та аудит ділянки;
 - імпорт GeoJSON/PDF і ZIP;
 - відкриття раніше перенесеного PDF із Bucket;
-- PDF, DOCX, друк, CSV і GeoJSON export;
+- PDF, DOCX, друк, Excel, CSV і GeoJSON export;
 - Brevo HTTP API і Telegram;
 - ручний backup, перевірка архіву та тестовий restore drill.
 

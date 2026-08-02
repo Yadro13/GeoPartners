@@ -32,9 +32,10 @@
 | 18 | Розширена перевірка backup/restore | Перевірка архіву й критичних таблиць, безпечне відновлення в окрему БД та фактичний restore drill | staging | 5 |
 | 19 | Експлуатаційний контроль якості | Health-check PostgreSQL/storage/outbox, структуровані журнали без PII, CI, browser smoke та реальний staging integration test з cleanup | staging | 8 |
 | 20 | Документація передачі production | Runbook Railway, backup/restore, dry-run міграції PostgreSQL/Bucket, rollback, production checklist і реєстр питань | staging | 5 |
-| 21 | Інтерфейс українською, німецькою та англійською | Перемикач і профільна мова, desktop/mobile/auth/admin/import/report/system UI, локальні формати чисел і дат, локалізовані системні email | готово до staging deploy | 14 |
+| 21 | Інтерфейс українською, німецькою та англійською | Перемикач і профільна мова, desktop/mobile/auth/admin/import/report/system UI, локальні формати чисел і дат, локалізовані системні email | staging | 14 |
 | 22 | Додаткова UX-надійність і доступність | Loading/error/404, empty/error стани, focus trap, Escape, повернення фокуса й перевірка переповнення на смартфонах | staging | 4 |
-|  | **Разом мінімально** |  |  | **135,5** |
+| 23 | Розширений експорт Excel | XLSX із першим листом-матрицею за зразком замовника, датами проходження, підсумками та окремим детальним листом по кожній ділянці й етапу | staging | 6 |
+|  | **Разом мінімально** |  |  | **141,5** |
 
 ## Не включено до підсумку
 
