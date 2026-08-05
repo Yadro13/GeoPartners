@@ -14,7 +14,7 @@ export function VersionCompareDialog({ comparison, baseMap, busy, error, onClose
   const common = useTranslations("common");
   const format = useFormatter();
   const mapPlots = comparison.current ? [comparisonFeature(comparison.target, "version-target", "version-target"), comparisonFeature(comparison.current, "version-current", "version-current")] : [comparisonFeature(comparison.target, "version-target", "version-target")];
-  const labels: VersionLabels = { cadastral: t("cadastral"), name: t("name"), category: t("category"), area: t("area"), outlineArea: t("outlineArea"), capacity: t("capacity"), stagesCosts: t("stagesCosts"), mainCandidate: t("mainCandidate"), owner: t("owner"), lessee: t("lessee"), outline: t("outline"), document: t("document"), missing: t("missing"), notDefined: common("notDefined"), points: (count) => t("points", { count }), stageSummary: (count, cost) => t("stageSummary", { count, cost }) };
+  const labels: VersionLabels = { cadastral: t("cadastral"), name: t("name"), category: t("category"), area: t("area"), outlineArea: t("outlineArea"), capacity: t("capacity"), stagesCosts: t("stagesCosts"), mainCandidate: t("mainCandidate"), owner: t("owner"), lessee: t("lessee"), documentActualAt: t("documentActualAt"), outline: t("outline"), document: t("document"), missing: t("missing"), notDefined: common("notDefined"), points: (count) => t("points", { count }), stageSummary: (count, cost) => t("stageSummary", { count, cost }) };
   const differences = compareFields(comparison.current, comparison.target, labels, (value, options) => format.number(value, options)); const blocked = comparison.blockingMessages.length > 0;
   const overlapFeatures = comparison.conflicts.map(({ geometry }) => ({ type: "Feature" as const, properties: {}, geometry }));
   return <WorkspaceModal title={t("title")} description={comparison.target.properties.cadastralNumber} onClose={onClose} wide><div className="version-compare">
@@ -26,7 +26,7 @@ export function VersionCompareDialog({ comparison, baseMap, busy, error, onClose
 
 function comparisonFeature(plot: PlotFeature, id: string, category: string): PlotFeature { return { ...plot, properties: { ...plot.properties, id, category } }; }
 
-type VersionLabels = { cadastral: string; name: string; category: string; area: string; outlineArea: string; capacity: string; stagesCosts: string; mainCandidate: string; owner: string; lessee: string; outline: string; document: string; missing: string; notDefined: string; points: (count: number) => string; stageSummary: (count: number, cost: string) => string };
+type VersionLabels = { cadastral: string; name: string; category: string; area: string; outlineArea: string; capacity: string; stagesCosts: string; mainCandidate: string; owner: string; lessee: string; documentActualAt: string; outline: string; document: string; missing: string; notDefined: string; points: (count: number) => string; stageSummary: (count: number, cost: string) => string };
 
 type NumberOptions = { minimumFractionDigits?: number; maximumFractionDigits?: number };
 
@@ -42,6 +42,7 @@ function compareFields(current: PlotFeature | null, target: PlotFeature, labels:
     [labels.mainCandidate, current?.properties.mainCandidateCadastral, target.properties.mainCandidateCadastral],
     [labels.owner, current?.properties.owner, target.properties.owner],
     [labels.lessee, current?.properties.lessee, target.properties.lessee],
+    [labels.documentActualAt, current?.properties.documentActualAt, target.properties.documentActualAt],
     [labels.outline, current ? labels.points(coordinateCount(current)) : null, labels.points(coordinateCount(target))],
     [labels.document, current?.properties.documentName, target.properties.documentName],
   ] as const;

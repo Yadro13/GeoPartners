@@ -50,8 +50,9 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
     validateCoordinates(coordinates);
     const geometry: Polygon = { type: "Polygon", coordinates };
     const sourceStem = filename.replace(/\.(geo)?json$/i, "");
+    const sourceBasename = sourceStem.split(/[\\/]/).at(-1) ?? sourceStem;
     const cadastral = textValue(properties.cadastralNumber ?? properties.cadastral_number)
-      || formatCadastral(sourceStem)
+      || formatCadastral(sourceBasename)
       || `Без номера ${index + 1}${polygons.length > 1 ? `.${polygonIndex + 1}` : ""}`;
     const id = textValue(properties.id) || makeId();
     return {
@@ -67,6 +68,7 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
         mainCandidateCadastral: textValue(properties.mainCandidateCadastral ?? properties.main_candidate_cadastral),
         owner: textValue(properties.owner),
         lessee: textValue(properties.lessee),
+        documentActualAt: textValue(properties.documentActualAt ?? properties.document_actual_at),
         status: textValue(properties.status),
         statusProgress: parsePlotStatusProgress(properties.statusProgress ?? properties.status_progress),
         sourceFilename: textValue(properties.sourceFilename) || sourceStem,

@@ -64,6 +64,13 @@
       "when": 1785623902854,
       "tag": "0008_yellow_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785963179994,
+      "tag": "0009_glamorous_black_panther",
+      "breakpoints": true
     }
   ]
 }

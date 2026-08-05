@@ -4,7 +4,7 @@ type UploadKind = "package" | "pdf";
 
 export function validateUploadFiles(files: File[], kind: UploadKind = "package") {
   if (!files.length) throw new Error("Файли не вибрано.");
-  if (files.length > IMPORT_UPLOAD_LIMITS.files) throw new Error(`За один раз можна завантажити не більше ${IMPORT_UPLOAD_LIMITS.files} файлів.`);
+  if (files.length > IMPORT_UPLOAD_LIMITS.files) throw new Error(`Один технічний пакет може містити не більше ${IMPORT_UPLOAD_LIMITS.files} файлів. Повторіть імпорт через стандартний інтерфейс для автоматичного пакетування.`);
 
   let totalBytes = 0;
   for (const file of files) {

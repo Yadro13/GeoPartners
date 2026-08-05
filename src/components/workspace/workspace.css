@@ -1673,6 +1673,20 @@
   width: 100%;
 }
 
+.import-source-actions {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.import-progress {
+  background: var(--green-pale);
+  color: var(--green-dark);
+  font-size: 12px;
+  margin: 12px 0 0;
+  padding: 10px;
+}
+
 .file-drop span {
   color: var(--muted);
   font-size: 11px;
@@ -3503,6 +3517,14 @@
 }
 
 @media (max-width: 899px) {
+  .import-source-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .file-drop {
+    min-height: 116px;
+  }
+
   .leaflet-control-attribution {
     display: none;
   }

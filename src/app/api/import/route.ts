@@ -49,9 +49,9 @@ export async function POST(request: Request) {
         const geoStem = fileStem(geoFile.name); const geoCad = cadastralDigits(original.properties.cadastralNumber);
         const byStem = pdfs.find((pdf) => pdf.stem === geoStem); const byCad = pdfs.find((pdf) => cadastralDigits(pdf.metadata.cadastralNumber) === geoCad && geoCad.length === 19); const document = byCad ?? byStem;
         if (document && geoCad.length === 19 && document.metadata.cadastralNumber && cadastralDigits(document.metadata.cadastralNumber) !== geoCad) throw new Error(`Кадастровий номер у ${geoFile.name} не збігається з ${document.file.name}.`);
-        if (document) usedPdfs.add(document.file.name); else warnings.push(`Для ${geoFile.name} не знайдено PDF; ділянку імпортовано без документа.`);
+        if (document) usedPdfs.add(document.file.name);
         const metadata = document?.metadata;
-        const feature: PlotFeature = { ...original, properties: { ...original.properties, cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber, areaHa: metadata?.areaHa || original.properties.areaHa, owner: metadata?.owner || original.properties.owner, lessee: metadata?.lessee || original.properties.lessee, sourceFilename: geoStem } };
+        const feature: PlotFeature = { ...original, properties: { ...original.properties, cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber, areaHa: metadata?.areaHa || original.properties.areaHa, owner: metadata?.owner || original.properties.owner, lessee: metadata?.lessee || original.properties.lessee, documentActualAt: metadata?.documentActualAt || original.properties.documentActualAt, sourceFilename: geoStem } };
         if (feature.properties.status && !knownStatuses.has(feature.properties.status)) {
           warnings.push(`${geoFile.name}: статус «${feature.properties.status}» відсутній у довіднику; ділянку імпортовано без статусу.`);
           feature.properties.status = "";
@@ -72,6 +72,11 @@ export async function POST(request: Request) {
         const existing = existingByCadastral.get(cadastral);
         if (existing) {
           feature.properties.id = existing.id;
+          if (!document) Object.assign(feature.properties, {
+            owner: feature.properties.owner || existing.owner,
+            lessee: feature.properties.lessee || existing.lessee,
+            documentActualAt: feature.properties.documentActualAt || existing.documentActualAt,
+          });
           if (!(feature.properties.statusProgress?.length) && !feature.properties.status) {
             feature.properties.status = existing.status;
             feature.properties.statusProgress = existing.statusProgress;

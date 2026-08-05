@@ -48,6 +48,7 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, o
       <dl className="details-grid">
         <div><dt>{t("area")}</dt><dd>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} ha</dd></div>
         <div><dt>{t("stages")}</dt><dd>{t("stagesDone", { done: completedStages.length, total: plotStatuses.length })}</dd></div>
+        {properties.documentActualAt ? <div><dt>{t("documentActualAt")}</dt><dd>{format.dateTime(new Date(properties.documentActualAt), { dateStyle: "medium", timeStyle: "short" })}</dd></div> : null}
         {totalCost > 0 ? <div><dt>{t("totalExpenses")}</dt><dd>{format.number(totalCost, { style: "currency", currency: "UAH" })}</dd></div> : null}
         <div><dt>{t("owner")}</dt><dd>{properties.owner}</dd></div>
         <div><dt>{t("lessee")}</dt><dd>{properties.lessee}</dd></div>

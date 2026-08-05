@@ -11,6 +11,7 @@ export type PlotProperties = {
   mainCandidateCadastral: string;
   owner: string;
   lessee: string;
+  documentActualAt?: string;
   status?: string;
   statusProgress?: PlotStatusProgress[];
   sourceFilename?: string;
@@ -50,6 +51,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         mainCandidateCadastral: "",
         owner: "Демо-власник",
         lessee: "Демо-орендар",
+        documentActualAt: "2026-05-02T12:56:00",
       },
     },
     {
@@ -68,6 +70,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         mainCandidateCadastral: "",
         owner: "Демо-власник",
         lessee: "Демо-орендар",
+        documentActualAt: "2026-05-02T12:56:00",
         status: "обрана ділянка як варіант",
         statusProgress: [{ statusId: "status_01", completedAt: "2026-07-22T09:30:00.000Z", cost: null }],
       },
@@ -88,6 +91,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         mainCandidateCadastral: "6820982100:04:051:0019",
         owner: "Демо-власник",
         lessee: "Демо-орендар",
+        documentActualAt: "2026-05-02T12:55:00",
       },
     },
   ],

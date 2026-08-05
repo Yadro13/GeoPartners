@@ -60,6 +60,7 @@ const plotFieldLabels: Record<string, string> = {
   mainCandidateCadastral: "Основний кандидат",
   owner: "Власник",
   lessee: "Орендар",
+  documentActualAt: "Дата актуальності документа",
   geometry: "Контур",
   document: "Документ",
 };
@@ -96,6 +97,7 @@ function plotSnapshot(plot: PlotFeature): Record<string, unknown> {
     mainCandidateCadastral: properties.mainCandidateCadastral,
     owner: properties.owner,
     lessee: properties.lessee,
+    documentActualAt: properties.documentActualAt,
     geometry: plot.geometry,
     document: properties.documentName ?? properties.hasDocument ?? false,
   };

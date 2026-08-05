@@ -159,30 +159,28 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     setModal(null); setToast(t("importComplete", { added, updated, skipped: result.skipped.length ? t("skippedSuffix", { count: result.skipped.length }) : "" }));
   };
 
-  const importFiles = async (files: File[]) => {
+  const importFiles = async (batches: File[][], onProgress: (completed: number, total: number) => void) => {
     if (!preview) {
-      const form = new FormData(); files.forEach((file) => form.append("files", file));
-      const response = await fetch("/api/import", { method: "POST", body: form }); const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.error ?? t("packageImportFailed"));
-      const saved = body.plots as PlotFeature[]; const returnedCategories = body.categories as Record<string, CategoryDefinition>;
-      setPlots((current) => { const next = [...current]; for (const item of saved) { const index = next.findIndex(({ properties }) => properties.id === item.properties.id || properties.cadastralNumber === item.properties.cadastralNumber); if (index >= 0) next[index] = item; else next.push(item); } return next; });
-      setCategories((current) => categoriesWithDefaults({ ...current, ...returnedCategories })); if (saved[0]) setSelectedId(saved[0].properties.id);
-      setModal(null); setToast(t("packageImported", { count: saved.length, warnings: body.warnings?.length ? t("warningsSuffix", { count: body.warnings.length }) : "" })); return;
+      let importedCount = 0; let warningCount = 0; let firstSaved: PlotFeature | undefined;
+      for (let index = 0; index < batches.length; index += 1) {
+        const form = new FormData(); batches[index].forEach((file) => form.append("files", file));
+        const response = await fetch("/api/import", { method: "POST", body: form }); const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(t("batchImportFailed", { batch: index + 1, total: batches.length, completed: importedCount, reason: body?.error ?? t("packageImportFailed") }));
+        const saved = body.plots as PlotFeature[]; const returnedCategories = body.categories as Record<string, CategoryDefinition>;
+        importedCount += saved.length; warningCount += Array.isArray(body.warnings) ? body.warnings.length : 0; firstSaved ??= saved[0];
+        setPlots((current) => { const next = [...current]; for (const item of saved) { const savedIndex = next.findIndex(({ properties }) => properties.id === item.properties.id || properties.cadastralNumber === item.properties.cadastralNumber); if (savedIndex >= 0) next[savedIndex] = item; else next.push(item); } return next; });
+        setCategories((current) => categoriesWithDefaults({ ...current, ...returnedCategories }));
+        onProgress(index + 1, batches.length);
+      }
+      if (firstSaved) setSelectedId(firstSaved.properties.id);
+      setModal(null); setToast(t("packageImported", { count: importedCount, warnings: warningCount ? t("warningsSuffix", { count: warningCount }) : "" })); return;
     }
+    const files = batches.flat();
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
     const results = await Promise.all(geoFiles.map(async (file) => normalizeImport(JSON.parse(await file.text()), file.name)));
     const combined: ImportResult = { plots: results.flatMap(({ plots }) => plots), categories: Object.assign({}, ...results.map(({ categories }) => categories)), skipped: results.flatMap(({ skipped }) => skipped) };
-    if (pdfFiles.length) {
-      const form = new FormData(); pdfFiles.forEach((file) => form.append("files", file)); const response = await fetch("/api/import/inspect", { method: "POST", body: form }); const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? t("pdfReadFailed"));
-      for (const plot of combined.plots) {
-        const digits = plot.properties.cadastralNumber.replace(/\D/g, ""); const source = plot.properties.sourceFilename?.toLocaleLowerCase();
-        const document = body.documents.find((item: { stem: string; metadata: { cadastralNumber: string } }) => item.stem === source || item.metadata.cadastralNumber.replace(/\D/g, "") === digits);
-        if (!document) continue;
-        if (document.metadata.cadastralNumber && document.metadata.cadastralNumber.replace(/\D/g, "") !== digits) throw new Error(t("cadastralPdfMismatch", { name: document.name }));
-        Object.assign(plot.properties, { cadastralNumber: document.metadata.cadastralNumber || plot.properties.cadastralNumber, areaHa: document.metadata.areaHa || plot.properties.areaHa, owner: document.metadata.owner || plot.properties.owner, lessee: document.metadata.lessee || plot.properties.lessee, documentName: document.name, documentUrl: URL.createObjectURL(pdfFiles.find((file) => file.name === document.name)!), hasDocument: true });
-      }
-    }
+    for (const plot of combined.plots) { const pdf = pdfFiles.find((file) => file.name.replace(/\.pdf$/i, "").toLocaleLowerCase() === plot.properties.sourceFilename?.toLocaleLowerCase()); if (pdf) Object.assign(plot.properties, { documentName: pdf.name, documentUrl: URL.createObjectURL(pdf), hasDocument: true }); }
+    onProgress(batches.length, batches.length);
     await importPlots(combined);
   };
 

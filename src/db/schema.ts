@@ -166,6 +166,7 @@ export const plot = pgTable(
     mainCandidateCadastral: text("main_candidate_cadastral").default("").notNull(),
     owner: text("owner").default("").notNull(),
     lessee: text("lessee").default("").notNull(),
+    documentActualAt: text("document_actual_at").default("").notNull(),
     sourceFilename: text("source_filename"),
     pdfObjectKey: text("pdf_object_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

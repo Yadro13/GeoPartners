@@ -1,6 +1,7 @@
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotFeature } from "@/components/workspace/types";
 import type { LandDocumentMetadata } from "@/lib/pdf-metadata";
+import { packImportFileGroups, packImportFiles } from "@/lib/import-batches";
 import { categoriesWithDefaults, normalizeImport } from "@/lib/plot-data";
 import { calculatePolygonAreaHa, findPlotConflicts, repairPolygonGeometry, validatePolygonGeometry, type GeometryRepairAction, type GeometryValidationIssue, type GeometryValidationMarker, type PlotConflict } from "@/lib/geometry";
 
@@ -48,20 +49,27 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
         const byCad = documents.find((document) => digits(document.metadata.cadastralNumber) === geoDigits && geoDigits.length === 19);
         const document = byCad ?? byStem ?? null;
         if (document && geoDigits.length === 19 && document.metadata.cadastralNumber && digits(document.metadata.cadastralNumber) !== geoDigits) issues.push({ level: "error", message: `Кадастровий номер не збігається з ${document.name}.`, code: "cad-mismatch", values: { name: document.name } });
-        if (!document) issues.push({ level: "warning", message: "PDF не знайдено; буде збережено лише геометрію.", code: "pdf-missing" });
         const metadata = document?.metadata;
         const plot: PlotFeature = { ...original, properties: { ...original.properties,
           cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber,
           areaHa: metadata?.areaHa || original.properties.areaHa,
           owner: metadata?.owner || original.properties.owner,
           lessee: metadata?.lessee || original.properties.lessee,
+          documentActualAt: metadata?.documentActualAt || original.properties.documentActualAt,
           documentName: document?.name,
           hasDocument: Boolean(document),
         } };
         const finalDigits = digits(plot.properties.cadastralNumber);
         if (finalDigits.length !== 19) issues.push({ level: "error", message: "Не вдалося визначити повний кадастровий номер.", code: "invalid-cad" });
         const existing = existingPlots.find(({ properties }) => digits(properties.cadastralNumber) === finalDigits && finalDigits.length === 19);
-        if (existing) plot.properties.id = existing.properties.id;
+        if (existing) {
+          plot.properties.id = existing.properties.id;
+          if (!document) Object.assign(plot.properties, {
+            owner: plot.properties.owner || existing.properties.owner,
+            lessee: plot.properties.lessee || existing.properties.lessee,
+            documentActualAt: plot.properties.documentActualAt || existing.properties.documentActualAt,
+          });
+        }
         candidates.push({ key: `${file.name}-${plot.properties.id}`, included: true, geoName: file.name, pdfName: document?.name ?? null, plot, action: existing ? "update" : "create", coordinateCount: plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), sourceIssues: issues, issues: [], conflicts: [], geometryIssues: [], validationMarkers: [], repairActions: [], appliedRepairs: [] });
       }
     } catch (error) { packageIssues.push({ level: "error", message: `${file.name}: ${error instanceof Error ? error.message : "не вдалося прочитати GeoJSON"}`, code: "geo-read", values: { name: file.name } }); }
@@ -101,23 +109,29 @@ export function setAllImportCandidatesIncluded(review: ImportReview, included: b
   return finalizeReview(candidates, review.categories, review.packageIssues, existingPlots);
 }
 
-export function buildReviewedImportFiles(review: ImportReview, files: File[]) {
+export function buildReviewedImportBatches(review: ImportReview, files: File[]) {
   const included = review.candidates.filter(({ included }) => included);
-  const geoNames = new Set(included.map(({ geoName }) => geoName));
-  const pdfNames = new Set(included.flatMap(({ pdfName }) => pdfName ? [pdfName] : []));
-  return files.flatMap((file) => {
-    if (/\.pdf$/i.test(file.name)) return pdfNames.has(file.name) ? [file] : [];
-    if (!/\.(geo)?json$/i.test(file.name)) return [file];
-    if (!geoNames.has(file.name)) return [];
-    const features = included.filter(({ geoName }) => geoName === file.name).map(({ plot }) => plot);
-    const content = JSON.stringify({ type: "FeatureCollection", categories: review.categories, features });
-    return [new File([content], file.name, { type: "application/geo+json", lastModified: file.lastModified })];
+  const byName = new Map(files.map((file) => [file.name, file]));
+  const sourceCounts = Map.groupBy(included, ({ geoName }) => geoName);
+  const sourceIndexes = new Map<string, number>();
+  const groups = included.map((candidate) => {
+    const source = byName.get(candidate.geoName);
+    if (!source) throw new Error(`${candidate.geoName}: вихідний GeoJSON не знайдено.`);
+    const index = (sourceIndexes.get(candidate.geoName) ?? 0) + 1;
+    sourceIndexes.set(candidate.geoName, index);
+    const geoName = sourceCounts.get(candidate.geoName)!.length > 1 ? indexedGeoName(candidate.geoName, index) : candidate.geoName;
+    const content = JSON.stringify({ type: "FeatureCollection", categories: review.categories, features: [candidate.plot] });
+    const geo = new File([content], geoName, { type: "application/geo+json", lastModified: source.lastModified });
+    const pdf = candidate.pdfName ? byName.get(candidate.pdfName) : undefined;
+    return pdf ? [geo, pdf] : [geo];
   });
+  return packImportFileGroups(groups);
 }
 
 function finalizeReview(candidates: ImportCandidate[], categories: Record<string, CategoryDefinition>, packageIssues: ImportIssue[], existingPlots: PlotFeature[]): ImportReview {
   const includedCandidates = candidates.filter(({ included }) => included);
   const includedIds = new Set(includedCandidates.map(({ plot }) => plot.properties.id));
+  const inspectOverlaps = includedCandidates.length * (existingPlots.length + includedCandidates.length) <= 20_000;
   const cadastralGroups = Map.groupBy(includedCandidates, (candidate) => digits(candidate.plot.properties.cadastralNumber));
   const finalPlots = new Map(existingPlots.map((plot) => [plot.properties.id, plot]));
   for (const candidate of includedCandidates) finalPlots.set(candidate.plot.properties.id, candidate.plot);
@@ -125,7 +139,7 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
     const validation = validatePolygonGeometry(candidate.plot.geometry); const repair = repairPolygonGeometry(candidate.plot.geometry);
     const duplicate = digits(candidate.plot.properties.cadastralNumber); const duplicateIssues: ImportIssue[] = candidate.included && duplicate.length === 19 && (cadastralGroups.get(duplicate)?.length ?? 0) > 1 ? [{ level: "error", message: "Цей кадастровий номер повторюється у пакеті.", code: "duplicate-cad" }] : [];
     const next: ImportCandidate = { ...candidate, coordinateCount: candidate.plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), issues: [...candidate.sourceIssues, ...duplicateIssues, ...validation.issues.map(({ level, message, code }) => ({ level, message, code: `geometry-${code}` }))], conflicts: [], geometryIssues: validation.issues, validationMarkers: validation.markers, repairActions: repair.actions };
-    if (!candidate.included) return next;
+    if (!candidate.included || !inspectOverlaps) return next;
     if (validation.issues.some(({ level }) => level === "error")) return next;
     const neighbors = [...finalPlots.values()].filter(({ properties }) => properties.id !== candidate.plot.properties.id);
     next.conflicts = findPlotConflicts(candidate.plot.geometry, neighbors);
@@ -143,13 +157,18 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
 
 async function inspectPdfFiles(files: File[]): Promise<InspectedDocument[]> {
   if (!files.length) return [];
-  const form = new FormData(); files.forEach((file) => form.append("files", file));
-  const response = await fetch("/api/import/inspect", { method: "POST", body: form }); const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error ?? "Не вдалося проаналізувати PDF.");
-  return body.documents as InspectedDocument[];
+  const documents: InspectedDocument[] = [];
+  for (const batch of packImportFiles(files)) {
+    const form = new FormData(); batch.forEach((file) => form.append("files", file));
+    const response = await fetch("/api/import/inspect", { method: "POST", body: form }); const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error ?? "Не вдалося проаналізувати PDF.");
+    documents.push(...body.documents as InspectedDocument[]);
+  }
+  return documents;
 }
 
 function stem(name: string) { return name.replace(/\.(pdf|geojson|json)$/i, "").toLocaleLowerCase(); }
+function indexedGeoName(name: string, index: number) { return name.replace(/\.(geo)?json$/i, `-${index}.geojson`); }
 function digits(value: string) { return value.replace(/\D/g, ""); }
 function formatSquareMeters(areaSquareMeters: number) { return `${areaSquareMeters.toLocaleString("uk-UA", { minimumFractionDigits: areaSquareMeters < 1 ? 2 : 0, maximumFractionDigits: 2 })} м²`; }
 function countIssues(issues: ImportIssue[], level: ImportIssue["level"]) {

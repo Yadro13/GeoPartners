@@ -11,7 +11,7 @@ export function plotRowToFeature(row: PlotRow): PlotFeature {
   return { type: "Feature", geometry: row.geometry, properties: {
     id: row.id, cadastralNumber: row.cadastralNumber, name: row.name, category: row.categoryId ?? "default",
     areaHa: Number(row.areaHa), projectCapacity: Number(row.projectCapacity), status: row.status, statusProgress: parsePlotStatusProgress(row.statusProgress),
-    mainCandidateCadastral: row.mainCandidateCadastral, owner: row.owner, lessee: row.lessee,
+    mainCandidateCadastral: row.mainCandidateCadastral, owner: row.owner, lessee: row.lessee, documentActualAt: row.documentActualAt,
     sourceFilename: row.sourceFilename ?? undefined, documentName: row.pdfObjectKey?.split("/").at(-1),
     documentUrl: row.pdfObjectKey ? `/api/plots/${encodeURIComponent(row.id)}/document` : undefined,
     hasDocument: Boolean(row.pdfObjectKey),
@@ -29,7 +29,7 @@ export function featureToPlotValues(feature: PlotFeature) {
     categoryId: properties.category || "default", geometry: feature.geometry,
     areaHa: String(properties.areaHa || 0), projectCapacity: String(properties.projectCapacity || 0),
     status: properties.status ?? "", statusProgress: parsePlotStatusProgress(properties.statusProgress), mainCandidateCadastral: properties.mainCandidateCadastral ?? "",
-    owner: properties.owner ?? "", lessee: properties.lessee ?? "", sourceFilename: properties.sourceFilename ?? null,
+    owner: properties.owner ?? "", lessee: properties.lessee ?? "", documentActualAt: properties.documentActualAt ?? "", sourceFilename: properties.sourceFilename ?? null,
   };
 }
 

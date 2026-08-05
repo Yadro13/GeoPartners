@@ -209,6 +209,8 @@ const reportLocales = {
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
   await page.getByRole("heading", { name: "Налаштування", exact: true }).waitFor();
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
+  await page.getByRole("button", { name: /^Вибрати папку/ }).waitFor();
+  await page.getByRole("button", { name: /^Вибрати GeoJSON, PDF або ZIP/ }).waitFor();
   assert(await page.getByRole("dialog").evaluate((dialog) => dialog.contains(document.activeElement)), "modal moves keyboard focus inside");
   await page.keyboard.press("Shift+Tab");
   assert(await page.getByRole("dialog").evaluate((dialog) => dialog.contains(document.activeElement)), "modal traps backward keyboard focus");
@@ -216,9 +218,9 @@ const reportLocales = {
   await page.getByRole("dialog").waitFor({ state: "detached" });
   assert(await page.getByRole("button", { name: "Імпортувати дані" }).evaluate((button) => button === document.activeElement), "modal returns focus to its trigger");
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "damaged.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "damaged.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
   await page.getByText("damaged.zip: вміст файлу не відповідає формату ZIP.").waitFor();
-  await page.locator('input[type="file"]').setInputFiles(zipUpload());
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(zipUpload());
   await page.getByText("1 ZIP", { exact: true }).waitFor();
   await page.getByText("1 GeoJSON", { exact: true }).waitFor();
   await page.getByText("1 PDF", { exact: true }).waitFor();
@@ -228,7 +230,7 @@ const reportLocales = {
   assert(!(await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).isDisabled()), "ZIP pair reaches the normal import review");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-zip-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/Зовнішнє кільце не замкнене/).waitFor();
   await page.getByText(/Повторюваних вершин:/).waitFor();
@@ -246,7 +248,7 @@ const reportLocales = {
   await page.getByRole("button", { name: /Підтвердити імпорт \(1\)/ }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "invalid-geometries.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(invalidGeometryPackage())) });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "invalid-geometries.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(invalidGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/Самоперетинів контуру:/).waitFor();
   await page.getByText(/Зовнішнє кільце не замкнене/).waitFor();
@@ -257,7 +259,7 @@ const reportLocales = {
   assert((await page.locator(".map-validation-marker--warning").count()) >= 1, "short segments are marked as warnings");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-geometry-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "selective.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(selectiveGeometryPackage())) });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "selective.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(selectiveGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/Самоперетинів контуру:/).waitFor();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "invalid selected candidate blocks a mixed package");
@@ -274,14 +276,15 @@ const reportLocales = {
   await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
-  await page.locator('input[type="file"]').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
   assert(!(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled()), "overlapping import remains available during review");
+  await page.getByText("PDF не додано", { exact: true }).waitFor();
   assert((await page.locator(".map-conflict-area").count()) >= 1, "import review map highlights overlap area");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-overlap-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles([
     geoJsonUpload("6820982100040510018.geojson"),
     pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0019"),
   ]);
@@ -289,7 +292,7 @@ const reportLocales = {
   await page.getByText(/Кадастровий номер не збігається/).waitFor();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "mismatched cadastral blocks import");
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles([
     geoJsonUpload("6820982100040510018.geojson"),
     pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0018"),
   ]);
@@ -406,7 +409,7 @@ const reportLocales = {
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-plot-stages.png") });
   await page.getByRole("dialog").getByRole("button", { name: "Скасувати", exact: true }).click();
   await page.getByRole("button", { name: "Імпорт", exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "selective.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(selectiveGeometryPackage())) });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "selective.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(selectiveGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByLabel("Імпортувати 1111111111:11:111:1101", { exact: true }).uncheck();
   await page.getByText("1/2 вибрано").waitFor();
@@ -415,7 +418,7 @@ const reportLocales = {
   assert(!(await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).isDisabled()), "mobile candidate selection unblocks the valid subset");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-import-selection-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByRole("button", { name: "Застосувати (1)", exact: true }).click();
   await page.getByText("Виправлення застосовано").waitFor();
@@ -426,7 +429,7 @@ const reportLocales = {
   await page.getByRole("button", { name: "Скасувати", exact: true }).click();
   assert(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled(), "mobile undo restores the geometry errors");
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
   const mobileConflictReview = await page.getByRole("dialog").evaluate((element) => ({ width: element.scrollWidth, clientWidth: element.clientWidth, viewport: innerWidth }));
@@ -434,7 +437,7 @@ const reportLocales = {
   assert(!(await page.getByRole("button", { name: /Підтвердити імпорт/ }).isDisabled()), "mobile overlap review keeps import available");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-import-overlap-review.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles([
     geoJsonUpload("6820982100040510018.geojson"),
     pdfUpload("6820982100040510018.pdf", "6820982100:04:051:0018"),
   ]);

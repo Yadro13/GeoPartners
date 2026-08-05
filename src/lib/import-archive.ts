@@ -15,17 +15,19 @@ export async function expandImportSelection(selected: File[]): Promise<ImportSel
 
   const archives = selected.filter((file) => /\.zip$/i.test(file.name));
   if (archives.length > IMPORT_UPLOAD_LIMITS.archives) throw new Error(`За один раз можна відкрити не більше ${IMPORT_UPLOAD_LIMITS.archives} ZIP-архівів.`);
-  if (archives.reduce((sum, file) => sum + file.size, 0) > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error("Загальний розмір ZIP-архівів перевищує 100 МБ.");
+  if (archives.reduce((sum, file) => sum + file.size, 0) > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error("Загальний розмір вибраних ZIP-архівів перевищує 500 МБ.");
 
-  const files = selected.filter((file) => !/\.zip$/i.test(file.name));
   const skippedEntries: string[] = [];
+  const looseSelection = selected.filter((file) => !/\.zip$/i.test(file.name));
+  looseSelection.filter((file) => !supportedEntry.test(file.name)).forEach((file) => skippedEntries.push(selectedPath(file)));
+  const files = looseSelection.filter((file) => supportedEntry.test(file.name)).map(normalizeSelectedFile);
   const names = new Set<string>();
   let totalBytes = validateLooseFiles(files, names);
 
   for (const archive of archives) {
     if (!archive.size) throw new Error(`${archive.name}: архів порожній.`);
-    if (archive.size > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error(`${archive.name}: розмір архіву перевищує 100 МБ.`);
-    const extracted = await extractArchive(archive, files.length, totalBytes, skippedEntries);
+    if (archive.size > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error(`${archive.name}: розмір архіву перевищує 500 МБ.`);
+    const extracted = await extractArchive(archive, totalBytes, skippedEntries);
     for (const file of extracted) {
       const key = file.name.toLocaleLowerCase();
       if (names.has(key)) throw new Error(`${archive.name}: файл ${file.name} дублюється у вибраному пакеті.`);
@@ -35,9 +37,8 @@ export async function expandImportSelection(selected: File[]): Promise<ImportSel
     }
   }
 
-  if (!files.length) throw new Error("У вибраних ZIP-архівах немає GeoJSON або PDF.");
-  if (files.length > IMPORT_UPLOAD_LIMITS.files) throw new Error(`Після розпакування пакет містить понад ${IMPORT_UPLOAD_LIMITS.files} файлів.`);
-  if (totalBytes > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error("Після розпакування загальний розмір пакета перевищує 100 МБ.");
+  if (!files.length) throw new Error("У вибраних джерелах немає GeoJSON або PDF.");
+  if (totalBytes > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error("Після розпакування загальний розмір вибраних даних перевищує 500 МБ.");
 
   return { files, archiveNames: archives.map(({ name }) => name), skippedEntries };
 }
@@ -53,22 +54,20 @@ function validateLooseFiles(files: File[], names: Set<string>) {
     names.add(key);
     totalBytes += file.size;
   }
-  if (files.length > IMPORT_UPLOAD_LIMITS.files) throw new Error(`За один раз можна завантажити не більше ${IMPORT_UPLOAD_LIMITS.files} файлів.`);
-  if (totalBytes > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error("Загальний розмір пакета перевищує 100 МБ.");
+  if (totalBytes > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error("Загальний розмір вибраних даних перевищує 500 МБ.");
   return totalBytes;
 }
 
-async function extractArchive(archive: File, currentCount: number, currentBytes: number, skippedEntries: string[]) {
+async function extractArchive(archive: File, currentBytes: number, skippedEntries: string[]) {
   const data = new Uint8Array(await archive.arrayBuffer());
   if (!isZipSignature(data)) throw new Error(`${archive.name}: вміст файлу не відповідає формату ZIP.`);
 
-  let extractedCount = currentCount;
   let extractedBytes = currentBytes;
   let scannedEntries = 0;
   const acceptedNames = new Set<string>();
   const entries = await unzipArchive(data, (entry) => {
     scannedEntries += 1;
-    if (scannedEntries > 300) throw new Error(`${archive.name}: архів містить забагато службових записів.`);
+    if (scannedEntries > IMPORT_UPLOAD_LIMITS.archiveEntries) throw new Error(`${archive.name}: архів містить понад ${IMPORT_UPLOAD_LIMITS.archiveEntries} записів.`);
     const path = normalizeArchivePath(entry.name, archive.name);
     if (!path || path.endsWith("/") || ignoredEntry.test(path)) return false;
     if (!supportedEntry.test(path)) {
@@ -77,24 +76,22 @@ async function extractArchive(archive: File, currentCount: number, currentBytes:
     }
     if (entry.originalSize <= 0) throw new Error(`${archive.name}: файл ${path} порожній.`);
     if (entry.originalSize > IMPORT_UPLOAD_LIMITS.fileBytes) throw new Error(`${archive.name}: файл ${path} перевищує 20 МБ після розпакування.`);
-    extractedCount += 1;
     extractedBytes += entry.originalSize;
-    if (extractedCount > IMPORT_UPLOAD_LIMITS.files) throw new Error(`${archive.name}: після розпакування пакет містить понад ${IMPORT_UPLOAD_LIMITS.files} файлів.`);
-    if (extractedBytes > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error(`${archive.name}: після розпакування пакет перевищує 100 МБ.`);
-    const name = basename(path);
-    const key = name.toLocaleLowerCase();
-    if (acceptedNames.has(key)) throw new Error(`${archive.name}: кілька файлів мають назву ${name}. Розкладіть їх в окремі архіви або перейменуйте.`);
+    if (extractedBytes > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error(`${archive.name}: після розпакування дані перевищують 500 МБ.`);
+    const key = path.toLocaleLowerCase();
+    if (acceptedNames.has(key)) throw new Error(`${archive.name}: шлях ${path} дублюється в архіві.`);
     acceptedNames.add(key);
     return true;
   }, archive.name);
 
   let actualBytes = currentBytes;
   return Object.entries(entries).map(([path, bytes]) => {
-    const name = basename(normalizeArchivePath(path, archive.name));
+    const normalizedPath = normalizeArchivePath(path, archive.name);
+    const name = `${archiveStem(archive.name)}/${normalizedPath}`;
     if (!bytes.byteLength) throw new Error(`${archive.name}: файл ${name} порожній.`);
     if (bytes.byteLength > IMPORT_UPLOAD_LIMITS.fileBytes) throw new Error(`${archive.name}: файл ${name} перевищує 20 МБ після розпакування.`);
     actualBytes += bytes.byteLength;
-    if (actualBytes > IMPORT_UPLOAD_LIMITS.packageBytes) throw new Error(`${archive.name}: фактичний розмір розпакованого пакета перевищує 100 МБ.`);
+    if (actualBytes > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error(`${archive.name}: фактичний розмір розпакованих даних перевищує 500 МБ.`);
     return new File([new Uint8Array(bytes).buffer], name, { type: mimeType(name), lastModified: archive.lastModified });
   });
 }
@@ -120,12 +117,22 @@ function normalizeArchivePath(path: string, archiveName: string) {
   return normalized.split("/").filter((part) => part && part !== ".").join("/");
 }
 
-function basename(path: string) {
-  return path.split("/").at(-1) ?? path;
-}
-
 function isZipSignature(data: Uint8Array) {
   return data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && ((data[2] === 0x03 && data[3] === 0x04) || (data[2] === 0x05 && data[3] === 0x06) || (data[2] === 0x07 && data[3] === 0x08));
+}
+
+function normalizeSelectedFile(file: File) {
+  const relativePath = selectedPath(file);
+  const normalizedPath = relativePath ? normalizeArchivePath(relativePath, file.name) : file.name;
+  return normalizedPath === file.name ? file : new File([file], normalizedPath, { type: file.type, lastModified: file.lastModified });
+}
+
+function selectedPath(file: File) {
+  return "webkitRelativePath" in file && typeof file.webkitRelativePath === "string" && file.webkitRelativePath ? file.webkitRelativePath : file.name;
+}
+
+function archiveStem(name: string) {
+  return name.replace(/\.zip$/i, "").replace(/[^a-zA-Z0-9._-]+/g, "_") || "archive";
 }
 
 function mimeType(name: string) {

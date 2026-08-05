@@ -6,6 +6,7 @@ export type LandDocumentMetadata = {
   areaHa: number;
   owner: string;
   lessee: string;
+  documentActualAt: string;
   location: string;
   purpose: string;
 };
@@ -33,29 +34,44 @@ export function extractLandDocumentMetadata(text: string): LandDocumentMetadata 
   return {
     cadastralNumber: cadastralMatch ? `${cadastralMatch[1]}:${cadastralMatch[2]}:${cadastralMatch[3]}:${cadastralMatch[4]}` : "",
     areaHa: areaMatch ? Number(areaMatch[1].replace(",", ".")) || 0 : 0,
-    owner: extractPerson(ownershipLines) || extractLegalEntity(ownershipLines),
-    lessee: extractLegalEntity(rightLines) || extractPerson(rightLines),
+    owner: extractSubjects(ownershipLines).join(", "),
+    lessee: extractSubjects(rightLines).join(", "),
+    documentActualAt: extractRequestDate(normalized),
     location: extractFollowingValue(lines, /Місце розташування/i),
     purpose: extractFollowingValue(lines, /Цільове призначення/i),
   };
 }
 
-function extractPerson(lines: string[]) {
-  const index = findLine(lines, /Прізвище.*ім['’]?я.*по батькові.*фізичної/i);
-  if (index < 0) return "";
-  const sameLine = lines[index].replace(/.*фізичної\s*/i, "").replace(/^особи\s*/i, "").trim();
-  if (sameLine) return sameLine;
-  const candidate = lines.slice(index + 1, index + 4).find((line) => !/^особи$/i.test(line) && !/^Дата /i.test(line)) ?? "";
-  return candidate.replace(/^особи\s+/i, "").trim();
+function extractSubjects(lines: string[]) {
+  const subjects: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/Прізвище.*ім['’]?я.*по батькові.*фізичної/i.test(lines[index])) {
+      const value = extractFieldValue(lines, index, /.*фізичної\s*/i, [/^Дата державної/i, /^Номер запису/i, /^Орган,? що/i, /^Відомості про/i]);
+      if (value) subjects.push(value.replace(/^особи\s*/i, "").trim());
+    } else if (/Найменування юридичної особи/i.test(lines[index])) {
+      const value = extractFieldValue(lines, index, /.*Найменування юридичної особи\s*/i, [/^Код (ЄДРПОУ|РНОКПП)/i, /^Дата державної/i, /^Номер запису/i, /^Орган,? що/i, /^Вид речового права/i, /^Відомості про/i]);
+      if (value) subjects.push(value);
+    }
+  }
+  return [...new Set(subjects.map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean))];
 }
 
-function extractLegalEntity(lines: string[]) {
-  const index = findLine(lines, /Найменування юридичної особи/i);
-  if (index < 0) return "";
-  const sameLine = lines[index].replace(/.*Найменування юридичної особи\s*/i, "").trim();
-  const after = lines[index + 1] ?? "";
-  const suffix = after && !/^Код /i.test(after) ? after : "";
-  return [sameLine, suffix].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+function extractFieldValue(lines: string[], index: number, label: RegExp, stops: RegExp[]) {
+  const values: string[] = [];
+  const sameLine = lines[index].replace(label, "").trim();
+  if (sameLine) values.push(sameLine);
+  for (let next = index + 1; next < lines.length; next += 1) {
+    if (stops.some((pattern) => pattern.test(lines[next]))) break;
+    values.push(lines[next]);
+  }
+  return values.join(" ").trim();
+}
+
+function extractRequestDate(text: string) {
+  const match = text.match(/(?:Час\s+та\s+дата|Дата\s+та\s+час)\s+запиту\s*:?\s*(\d{1,2}):(\d{2})\s+(\d{1,2})[-./]([01]?\d)[-./](\d{4})/i);
+  if (!match) return "";
+  const [, hours, minutes, day, month, year] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hours.padStart(2, "0")}:${minutes}:00`;
 }
 
 function extractFollowingValue(lines: string[], label: RegExp) {

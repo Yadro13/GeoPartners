@@ -1,0 +1,1 @@
+ALTER TABLE "plot" ADD COLUMN "document_actual_at" text DEFAULT '' NOT NULL;
