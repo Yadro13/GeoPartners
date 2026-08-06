@@ -275,6 +275,30 @@ function testPlot(name = "Staging E2E plot", status = "обрана ділянк
   };
 }
 
+function repeatImportPlot(owner, importDecisions) {
+  return {
+    type: "FeatureCollection",
+    features: [{
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: [[[30.5, 50.4], [30.502, 50.4], [30.502, 50.402], [30.5, 50.402], [30.5, 50.4]]] },
+      properties: {
+        id: `repeat-${plotId}`, cadastralNumber, name: "Imported name", category: "planned_wtg", areaHa: 1.2345,
+        projectCapacity: 0, mainCandidateCadastral: "imported-main", owner, lessee: "Imported lessee",
+        roadOwnershipType: "municipal", servitudeValidFrom: "", servitudeValidUntil: "", servitudePaymentAmount: null,
+        servitudePaymentPeriod: "", substationType: "", substationCapacityMw: null,
+        resultLinks: [], status: "проведено перемовини з власником", statusProgress: [],
+        ...(importDecisions ? { importDecisions } : {}),
+      },
+    }],
+  };
+}
+
+async function importGeoJson(jar, name, payload) {
+  const form = new FormData();
+  form.append("files", new File([JSON.stringify(payload)], name, { type: "application/geo+json" }));
+  return request("/api/import", { method: "POST", jar, form });
+}
+
 async function run() {
   await client.connect();
   databaseConnected = true;
@@ -380,6 +404,15 @@ async function run() {
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");
   const specializedPlot = sandboxPlots.payload.find((item) => item.properties?.id === plotId)?.properties;
   assert(specializedPlot?.roadOwnershipType === "private" && specializedPlot?.servitudePaymentAmount === 1200.5 && specializedPlot?.servitudePaymentPeriod === "yearly" && specializedPlot?.substationType === "110/35 kV" && specializedPlot?.substationCapacityMw === 80, "Specialized road, easement, and substation fields were not persisted.");
+  await importGeoJson(adminJar, `repeat-${runId}.geojson`, repeatImportPlot("Imported owner"));
+  const protectedRepeat = (await request("/api/plots", { jar: adminJar })).payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(protectedRepeat?.areaHa === 1.2345 && protectedRepeat?.owner === "E2E" && protectedRepeat?.lessee === "Imported lessee", "Repeat import did not update area, preserve a conflicting owner, or fill a missing lessee.");
+  assert(protectedRepeat?.name === "Staging E2E plot" && protectedRepeat?.category === "default" && protectedRepeat?.projectCapacity === 1.5, "Repeat import overwrote manually managed plot fields.");
+  assert(protectedRepeat?.roadOwnershipType === "private" && protectedRepeat?.servitudePaymentAmount === 1200.5 && protectedRepeat?.resultLinks?.length === 3, "Repeat import overwrote protected specialized values or result links.");
+  await importGeoJson(adminJar, `repeat-explicit-${runId}.geojson`, repeatImportPlot("Accepted imported owner", { fields: { owner: "imported" } }));
+  const explicitlyResolved = (await request("/api/plots", { jar: adminJar })).payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(explicitlyResolved?.owner === "Accepted imported owner", "Server ignored the administrator's explicit repeat-import field decision.");
+  logStep("repeat-import merge policy and explicit conflict resolution passed");
   await request("/api/snapshots", { method: "POST", jar: userJar, expected: [405] });
   await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [405] });
   const scheduledRun = await request("/api/internal/snapshots/run", { method: "POST", headers: { authorization: `Bearer ${process.env.SNAPSHOT_CRON_SECRET}` }, json: { force: true } });
