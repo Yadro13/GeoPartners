@@ -36,6 +36,8 @@ npm run test:e2e
 
 ## Експлуатація
 
+- [Журнал змін](CHANGELOG.md)
+- [Правила версіонування та релізів](docs/VERSIONING.md)
 - [Розгортання на Railway](RAILWAY_DEPLOY.md)
 - [Резервні копії та відновлення](docs/BACKUP_RESTORE.md)
 - [Dry-run перенесення staging у production](docs/STAGING_TO_PRODUCTION.md)
