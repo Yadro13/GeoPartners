@@ -26,7 +26,12 @@ const finalPlotKeys = { wtg: "finalWtgPlot", road: "finalRoadPlot", servitude: "
 const groupCountKeys = { wtg: "wtgCount", road: "roadCount", servitude: "servitudeCount", substation: "substationCount" } as const;
 const completedByKeys = { wtg: "stageCompletedByWtg", road: "stageCompletedByRoad", servitude: "stageCompletedByServitude", substation: "stageCompletedBySubstation" } as const;
 
-export function StatusReport({ plots, categories, statuses, view, onViewChange, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; view: ReportView; onViewChange: (view: ReportView) => void; canViewExpenses: boolean }) {
+export function ReportViewSelector({ view, onViewChange }: { view: ReportView; onViewChange: (view: ReportView) => void }) {
+  const t = useTranslations("reports");
+  return <div className="status-report__view"><span>{t("reportView")}</span><div className="segmented-control" role="group" aria-label={t("reportView")}>{reportViews.map((value) => <button aria-pressed={view === value} data-active={view === value} key={value} type="button" onClick={() => onViewChange(value)}>{t(viewLabelKeys[value])}</button>)}</div></div>;
+}
+
+export function StatusReport({ plots, categories, statuses, view, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; view: ReportView; canViewExpenses: boolean }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const locale = useLocale();
@@ -70,7 +75,6 @@ export function StatusReport({ plots, categories, statuses, view, onViewChange, 
 
   return <section className="status-report" aria-labelledby="status-report-title">
     <div className="status-report__heading"><div><span className="eyebrow">{t("progressEyebrow")}</span><h2 id="status-report-title">{resultType ? t(titleKeys[resultType]) : t("progressTitle")}</h2><p>{resultType ? t(canViewExpenses ? descriptionKeys[resultType] : restrictedDescriptionKeys[resultType]) : t(canViewExpenses ? "progressDescription" : "progressDescriptionRestricted")}</p></div><button className="command-button command-button--primary" disabled={exporting || !itemCount} type="button" onClick={runExport}><Download size={17} />{exporting ? t("exporting") : t("downloadExcel")}</button></div>
-    <div className="status-report__view"><span>{t("reportView")}</span><div className="segmented-control" role="group" aria-label={t("reportView")}>{reportViews.map((value) => <button aria-pressed={view === value} data-active={view === value} key={value} type="button" onClick={() => onViewChange(value)}>{t(viewLabelKeys[value])}</button>)}</div></div>
     <div className="status-report__filters">
       <label className="status-report__search"><span>{t("searchPlots")}</span><div><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></div></label>
       <label><span>{t("category")}</span><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="all">{t("allCategories")}</option>{Object.entries(categories).filter(([, category]) => category.visible !== false).map(([id, category]) => <option key={id} value={id}>{category.name}</option>)}</select></label>
