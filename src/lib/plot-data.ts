@@ -4,6 +4,7 @@ import type { PlotFeature } from "@/components/workspace/types";
 import { calculatePolygonAreaHa } from "@/lib/geometry";
 import { parsePlotStatusProgress, totalPlotStatusCost } from "@/lib/plot-status-progress";
 import { parsePlotResultLinks } from "@/lib/plot-result-links";
+import { nullableNumber, parseRoadOwnershipType, parseServitudePaymentPeriod, sourcePlotIdentifier } from "@/lib/plot-special-fields";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -24,7 +25,7 @@ export function normalizeImport(raw: unknown, filename = "import.geojson"): Impo
 
   candidates.forEach((candidate, index) => {
     try {
-      const normalized = normalizeFeature(candidate, filename, index);
+      const normalized = normalizeFeature(candidate, filename);
       plots.push(...normalized);
     } catch (error) {
       skipped.push(`${filename}, об'єкт ${index + 1}: ${error instanceof Error ? error.message : "невідома помилка"}`);
@@ -34,7 +35,7 @@ export function normalizeImport(raw: unknown, filename = "import.geojson"): Impo
   return { plots, categories: importedCategories, skipped };
 }
 
-function normalizeFeature(raw: unknown, filename: string, index: number): PlotFeature[] {
+function normalizeFeature(raw: unknown, filename: string): PlotFeature[] {
   if (!isRecord(raw)) throw new Error("об'єкт не є GeoJSON");
   const geometry = extractGeometry(raw);
   const properties = isRecord(raw.properties) ? raw.properties : {};
@@ -54,7 +55,7 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
     const sourceBasename = sourceStem.split(/[\\/]/).at(-1) ?? sourceStem;
     const cadastral = textValue(properties.cadastralNumber ?? properties.cadastral_number)
       || formatCadastral(sourceBasename)
-      || `Без номера ${index + 1}${polygons.length > 1 ? `.${polygonIndex + 1}` : ""}`;
+      || sourcePlotIdentifier(filename, polygonIndex, polygons.length);
     const id = textValue(properties.id) || makeId();
     return {
       type: "Feature",
@@ -69,6 +70,13 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
         mainCandidateCadastral: textValue(properties.mainCandidateCadastral ?? properties.main_candidate_cadastral),
         owner: textValue(properties.owner),
         lessee: textValue(properties.lessee),
+        roadOwnershipType: parseRoadOwnershipType(properties.roadOwnershipType ?? properties.road_ownership_type),
+        servitudeValidFrom: textValue(properties.servitudeValidFrom ?? properties.servitude_valid_from),
+        servitudeValidUntil: textValue(properties.servitudeValidUntil ?? properties.servitude_valid_until),
+        servitudePaymentAmount: nullableNumber(properties.servitudePaymentAmount ?? properties.servitude_payment_amount),
+        servitudePaymentPeriod: parseServitudePaymentPeriod(properties.servitudePaymentPeriod ?? properties.servitude_payment_period),
+        substationType: textValue(properties.substationType ?? properties.substation_type),
+        substationCapacityMw: nullableNumber(properties.substationCapacityMw ?? properties.substation_capacity_mw),
         documentActualAt: textValue(properties.documentActualAt ?? properties.document_actual_at),
         resultLinks: parsePlotResultLinks(properties.resultLinks ?? properties.result_links),
         status: textValue(properties.status),
@@ -132,8 +140,8 @@ export function downloadText(content: string, filename: string, type: string) {
 
 export function plotsToCsv(plots: PlotFeature[], includeExpenses = true) {
   const rows = [
-    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пов'язані результати", "Пройдені етапи", ...(includeExpenses ? ["Загальні витрати, грн"] : [])],
-    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, parsePlotResultLinks(properties.resultLinks).map(({ type, number }) => `${type}: ${number}`).join(", "), properties.statusProgress?.length ?? 0, ...(includeExpenses ? [totalPlotStatusCost(properties.statusProgress)] : [])]),
+    ["Кадастровий номер / ідентифікатор", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Форма власності дороги", "Сервітут діє з", "Сервітут діє до", "Оплата сервітуту, грн", "Періодичність оплати", "Тип підстанції", "Потужність підстанції, МВт", "Пов'язані результати", "Пройдені етапи", ...(includeExpenses ? ["Загальні витрати, грн"] : [])],
+    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, properties.roadOwnershipType, properties.servitudeValidFrom, properties.servitudeValidUntil, properties.servitudePaymentAmount, properties.servitudePaymentPeriod, properties.substationType, properties.substationCapacityMw, parsePlotResultLinks(properties.resultLinks).map(({ type, number }) => `${type}: ${number}`).join(", "), properties.statusProgress?.length ?? 0, ...(includeExpenses ? [totalPlotStatusCost(properties.statusProgress)] : [])]),
   ];
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
 }

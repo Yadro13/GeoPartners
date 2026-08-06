@@ -1,6 +1,7 @@
 import type { FeatureCollection, Polygon } from "geojson";
 import type { PlotStatusProgress } from "@/lib/plot-status-progress";
 import type { PlotResultLink, PlotResultType } from "@/lib/plot-result-links";
+import type { RoadOwnershipType, ServitudePaymentPeriod } from "@/lib/plot-special-fields";
 
 export const categorySystemRoles = ["default", "main_candidate", "alternative_candidate", "wtg_result", "road_result", "servitude_result", "substation_result"] as const;
 export type CategorySystemRole = (typeof categorySystemRoles)[number];
@@ -15,6 +16,13 @@ export type PlotProperties = {
   mainCandidateCadastral: string;
   owner: string;
   lessee: string;
+  roadOwnershipType?: RoadOwnershipType | "";
+  servitudeValidFrom?: string;
+  servitudeValidUntil?: string;
+  servitudePaymentAmount?: number | null;
+  servitudePaymentPeriod?: ServitudePaymentPeriod | "";
+  substationType?: string;
+  substationCapacityMw?: number | null;
   documentActualAt?: string;
   resultLinks?: PlotResultLink[];
   status?: string;

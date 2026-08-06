@@ -4,6 +4,7 @@ import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
 import { parsePlotResultLinks, type PlotResultType } from "@/lib/plot-result-links";
+import { hasResultType } from "@/lib/plot-special-fields";
 import type { PlotFeature } from "./types";
 
 type PlotDetailsProps = {
@@ -20,6 +21,7 @@ type PlotDetailsProps = {
 
 export function PlotDetails({ plot, compact = false, categories, plotStatuses, canViewExpenses, onEdit, onOpenStages, onDocuments, onOpenCard }: PlotDetailsProps) {
   const t = useTranslations("workspace");
+  const formT = useTranslations("plotForm");
   const format = useFormatter();
   if (!plot) {
     return <div className="plot-details-empty">{t("selectPlot")}</div>;
@@ -31,6 +33,10 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
   const totalCost = totalPlotStatusCost(completedStages);
   const resultLinks = parsePlotResultLinks(properties.resultLinks);
   const resultLabels: Record<PlotResultType, string> = { wtg: t("resultWtg"), road: t("resultRoad"), servitude: t("resultServitude"), substation: t("resultSubstation") };
+  const categoryRole = categories[properties.category]?.systemRole;
+  const roadRelated = hasResultType(properties, "road") || categoryRole === "road_result";
+  const servitudeRelated = hasResultType(properties, "servitude") || categoryRole === "servitude_result";
+  const substationRelated = hasResultType(properties, "substation") || categoryRole === "substation_result";
 
   return (
     <div className="plot-details" data-compact={compact}>
@@ -56,6 +62,11 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
         {canViewExpenses && totalCost > 0 ? <div><dt>{t("totalExpenses")}</dt><dd>{format.number(totalCost, { style: "currency", currency: "UAH" })}</dd></div> : null}
         <div className="details-grid__wide"><dt>{t("owner")}</dt><dd>{properties.owner || t("notSpecified")}</dd></div>
         <div className="details-grid__wide"><dt>{t("lessee")}</dt><dd>{properties.lessee || t("notSpecified")}</dd></div>
+        {roadRelated && properties.roadOwnershipType ? <div><dt>{t("roadOwnershipType")}</dt><dd>{t(properties.roadOwnershipType === "private" ? "roadPrivate" : "roadMunicipal")}</dd></div> : null}
+        {servitudeRelated && (properties.servitudeValidFrom || properties.servitudeValidUntil) ? <div><dt>{t("servitudeTerm")}</dt><dd>{[properties.servitudeValidFrom, properties.servitudeValidUntil].filter(Boolean).map((value) => format.dateTime(new Date(`${value}T00:00:00`), { dateStyle: "medium" })).join(" – ")}</dd></div> : null}
+        {servitudeRelated && properties.servitudePaymentAmount !== null && properties.servitudePaymentAmount !== undefined ? <div><dt>{t("servitudePayment")}</dt><dd>{format.number(properties.servitudePaymentAmount, { style: "currency", currency: "UAH" })}{properties.servitudePaymentPeriod ? ` · ${formT(`paymentPeriod_${properties.servitudePaymentPeriod}`)}` : ""}</dd></div> : null}
+        {substationRelated && properties.substationType ? <div><dt>{t("substationType")}</dt><dd>{properties.substationType}</dd></div> : null}
+        {substationRelated && properties.substationCapacityMw !== null && properties.substationCapacityMw !== undefined ? <div><dt>{t("substationCapacity")}</dt><dd>{format.number(properties.substationCapacityMw, { maximumFractionDigits: 3 })} MW</dd></div> : null}
         {resultLinks.length ? <div className="details-grid__wide"><dt>{t("resultLinks")}</dt><dd className="result-links-summary">{resultLinks.map((link, index) => <span key={`${link.type}-${link.number}-${index}`}><strong>{resultLabels[link.type]}</strong>{link.number}</span>)}</dd></div> : null}
       </dl>
 

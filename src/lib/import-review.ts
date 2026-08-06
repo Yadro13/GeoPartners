@@ -4,6 +4,7 @@ import type { LandDocumentMetadata } from "@/lib/pdf-metadata";
 import { packImportFileGroups, packImportFiles } from "@/lib/import-batches";
 import { categoriesWithDefaults, normalizeImport } from "@/lib/plot-data";
 import { calculatePolygonAreaHa, findPlotConflicts, repairPolygonGeometry, validatePolygonGeometry, type GeometryRepairAction, type GeometryValidationIssue, type GeometryValidationMarker, type PlotConflict } from "@/lib/geometry";
+import { plotIdentityKey } from "@/lib/plot-special-fields";
 
 export type ImportIssue = { level: "warning" | "error"; message: string; code?: string; values?: Record<string, string | number>; dedupeKey?: string };
 export type ImportCandidate = {
@@ -59,9 +60,7 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
           documentName: document?.name,
           hasDocument: Boolean(document),
         } };
-        const finalDigits = digits(plot.properties.cadastralNumber);
-        if (finalDigits.length !== 19) issues.push({ level: "error", message: "Не вдалося визначити повний кадастровий номер.", code: "invalid-cad" });
-        const existing = existingPlots.find(({ properties }) => digits(properties.cadastralNumber) === finalDigits && finalDigits.length === 19);
+        const existing = existingPlots.find(({ properties }) => plotIdentityKey(properties.cadastralNumber) === plotIdentityKey(plot.properties.cadastralNumber));
         if (existing) {
           plot.properties.id = existing.properties.id;
           if (!(plot.properties.resultLinks?.length)) plot.properties.resultLinks = existing.properties.resultLinks ?? [];
@@ -69,6 +68,15 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
             owner: plot.properties.owner || existing.properties.owner,
             lessee: plot.properties.lessee || existing.properties.lessee,
             documentActualAt: plot.properties.documentActualAt || existing.properties.documentActualAt,
+          });
+          Object.assign(plot.properties, {
+            roadOwnershipType: plot.properties.roadOwnershipType || existing.properties.roadOwnershipType,
+            servitudeValidFrom: plot.properties.servitudeValidFrom || existing.properties.servitudeValidFrom,
+            servitudeValidUntil: plot.properties.servitudeValidUntil || existing.properties.servitudeValidUntil,
+            servitudePaymentAmount: plot.properties.servitudePaymentAmount ?? existing.properties.servitudePaymentAmount,
+            servitudePaymentPeriod: plot.properties.servitudePaymentPeriod || existing.properties.servitudePaymentPeriod,
+            substationType: plot.properties.substationType || existing.properties.substationType,
+            substationCapacityMw: plot.properties.substationCapacityMw ?? existing.properties.substationCapacityMw,
           });
         }
         candidates.push({ key: `${file.name}-${plot.properties.id}`, included: true, geoName: file.name, pdfName: document?.name ?? null, plot, action: existing ? "update" : "create", coordinateCount: plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), sourceIssues: issues, issues: [], conflicts: [], geometryIssues: [], validationMarkers: [], repairActions: [], appliedRepairs: [] });
@@ -133,12 +141,12 @@ function finalizeReview(candidates: ImportCandidate[], categories: Record<string
   const includedCandidates = candidates.filter(({ included }) => included);
   const includedIds = new Set(includedCandidates.map(({ plot }) => plot.properties.id));
   const inspectOverlaps = includedCandidates.length * (existingPlots.length + includedCandidates.length) <= 20_000;
-  const cadastralGroups = Map.groupBy(includedCandidates, (candidate) => digits(candidate.plot.properties.cadastralNumber));
+  const cadastralGroups = Map.groupBy(includedCandidates, (candidate) => plotIdentityKey(candidate.plot.properties.cadastralNumber));
   const finalPlots = new Map(existingPlots.map((plot) => [plot.properties.id, plot]));
   for (const candidate of includedCandidates) finalPlots.set(candidate.plot.properties.id, candidate.plot);
   const finalized = candidates.map((candidate) => {
     const validation = validatePolygonGeometry(candidate.plot.geometry); const repair = repairPolygonGeometry(candidate.plot.geometry);
-    const duplicate = digits(candidate.plot.properties.cadastralNumber); const duplicateIssues: ImportIssue[] = candidate.included && duplicate.length === 19 && (cadastralGroups.get(duplicate)?.length ?? 0) > 1 ? [{ level: "error", message: "Цей кадастровий номер повторюється у пакеті.", code: "duplicate-cad" }] : [];
+    const duplicate = plotIdentityKey(candidate.plot.properties.cadastralNumber); const duplicateIssues: ImportIssue[] = candidate.included && (cadastralGroups.get(duplicate)?.length ?? 0) > 1 ? [{ level: "error", message: "Цей кадастровий номер або ідентифікатор повторюється у пакеті.", code: "duplicate-cad" }] : [];
     const next: ImportCandidate = { ...candidate, coordinateCount: candidate.plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), issues: [...candidate.sourceIssues, ...duplicateIssues, ...validation.issues.map(({ level, message, code }) => ({ level, message, code: `geometry-${code}` }))], conflicts: [], geometryIssues: validation.issues, validationMarkers: validation.markers, repairActions: repair.actions };
     if (!candidate.included || !inspectOverlaps) return next;
     if (validation.issues.some(({ level }) => level === "error")) return next;

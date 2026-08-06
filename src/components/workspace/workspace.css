@@ -1400,6 +1400,11 @@
   font-weight: 400;
 }
 
+.report-print-details {
+  display: none !important;
+  white-space: pre-line;
+}
+
 @media (max-width: 1500px) and (min-width: 900px) {
   .report-matrix--wtg .report-matrix__stage {
     font-size: 0;
@@ -1858,6 +1863,33 @@
   margin: 2px 0 10px;
 }
 
+.specialized-fields {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+  padding: 2px 0 10px;
+}
+
+.specialized-fields legend {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0;
+}
+
+.specialized-fields__grid {
+  align-items: end;
+  display: grid;
+  gap: 9px 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.specialized-fields__grid > p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+
 .result-link-row {
   align-items: start;
   display: grid;
@@ -2059,6 +2091,10 @@
   .plot-form .result-link-row {
     grid-template-columns: minmax(125px, 0.45fr) minmax(260px, 1.55fr);
     padding: 3px 0;
+  }
+
+  .plot-form .specialized-fields {
+    padding-bottom: 7px;
   }
 
   .plot-form .geometry-editor__map {
@@ -3269,7 +3305,16 @@
   }
 }
 
+@media (max-width: 899px) {
+  .specialized-fields__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media print {
+  .report-print-details {
+    display: block !important;
+  }
   @page {
     margin: 8mm;
     size: landscape;

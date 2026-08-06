@@ -15,6 +15,7 @@ import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
 import { readPdfBuffer, validateUploadFiles } from "@/lib/import-upload";
 import { errorFields, serverLog } from "@/lib/server-log";
+import { plotIdentityKey } from "@/lib/plot-special-fields";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     serverLog("info", "import.started", { workspace, fileCount: files.length, geoJsonCount: geoFiles.length, pdfCount: pdfFiles.length });
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
     const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder))]);
-    const existingByCadastral = new Map(existingRows.map((row) => [cadastralDigits(row.cadastralNumber), row]));
+    const existingByIdentity = new Map(existingRows.map((row) => [plotIdentityKey(row.cadastralNumber), row]));
     const knownStatuses = new Set(statusRows.map(({ name }) => name));
     const knownStatusIds = new Set(statusRows.map(({ id }) => id));
     const importedCategories: Record<string, CategoryDefinition> = {}; const warnings: string[] = []; const usedPdfs = new Set<string>(); const prepared: PreparedPlot[] = []; const batchCadastrals = new Set<string>();
@@ -65,11 +66,10 @@ export async function POST(request: Request) {
           const legacyStatus = statusRows.find(({ name }) => name === feature.properties.status);
           if (legacyStatus) feature.properties.statusProgress = [{ statusId: legacyStatus.id, completedAt: new Date().toISOString(), cost: null }];
         }
-        const cadastral = cadastralDigits(feature.properties.cadastralNumber);
-        if (cadastral.length !== 19) throw new Error(`${geoFile.name}: не вдалося визначити повний кадастровий номер.`);
-        if (batchCadastrals.has(cadastral)) throw new Error(`${feature.properties.cadastralNumber}: кадастровий номер повторюється у пакеті.`);
-        batchCadastrals.add(cadastral);
-        const existing = existingByCadastral.get(cadastral);
+        const identity = plotIdentityKey(feature.properties.cadastralNumber);
+        if (batchCadastrals.has(identity)) throw new Error(`${feature.properties.cadastralNumber}: кадастровий номер або ідентифікатор повторюється у пакеті.`);
+        batchCadastrals.add(identity);
+        const existing = existingByIdentity.get(identity);
         if (existing) {
           feature.properties.id = existing.id;
           if (!(feature.properties.resultLinks?.length)) feature.properties.resultLinks = existing.resultLinks;
@@ -77,6 +77,15 @@ export async function POST(request: Request) {
             owner: feature.properties.owner || existing.owner,
             lessee: feature.properties.lessee || existing.lessee,
             documentActualAt: feature.properties.documentActualAt || existing.documentActualAt,
+          });
+          Object.assign(feature.properties, {
+            roadOwnershipType: feature.properties.roadOwnershipType || existing.roadOwnershipType,
+            servitudeValidFrom: feature.properties.servitudeValidFrom || existing.servitudeValidFrom,
+            servitudeValidUntil: feature.properties.servitudeValidUntil || existing.servitudeValidUntil,
+            servitudePaymentAmount: feature.properties.servitudePaymentAmount ?? (existing.servitudePaymentAmount === null ? null : Number(existing.servitudePaymentAmount)),
+            servitudePaymentPeriod: feature.properties.servitudePaymentPeriod || existing.servitudePaymentPeriod,
+            substationType: feature.properties.substationType || existing.substationType,
+            substationCapacityMw: feature.properties.substationCapacityMw ?? (existing.substationCapacityMw === null ? null : Number(existing.substationCapacityMw)),
           });
           if (!(feature.properties.statusProgress?.length) && !feature.properties.status) {
             feature.properties.status = existing.status;

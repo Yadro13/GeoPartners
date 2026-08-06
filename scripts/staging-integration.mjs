@@ -260,6 +260,14 @@ function testPlot(name = "Staging E2E plot", status = "обрана ділянк
       mainCandidateCadastral: "",
       owner: "E2E",
       lessee: "",
+      roadOwnershipType: "private",
+      servitudeValidFrom: "2026-08-01",
+      servitudeValidUntil: "2027-08-01",
+      servitudePaymentAmount: 1200.5,
+      servitudePaymentPeriod: "yearly",
+      substationType: "110/35 kV",
+      substationCapacityMw: 80,
+      resultLinks: [{ type: "road", number: "E2E-R1" }, { type: "servitude", number: "E2E-S1" }, { type: "substation", number: "E2E-P1" }],
       status,
       ...(statusProgress ? { statusProgress } : {}),
       sourceFilename: `staging-e2e-${runId}`,
@@ -370,6 +378,8 @@ async function run() {
   await request("/api/plots", { method: "POST", jar: adminJar, expected: [201], json: testPlot() });
   const sandboxPlots = await request("/api/plots", { jar: userJar });
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");
+  const specializedPlot = sandboxPlots.payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(specializedPlot?.roadOwnershipType === "private" && specializedPlot?.servitudePaymentAmount === 1200.5 && specializedPlot?.servitudePaymentPeriod === "yearly" && specializedPlot?.substationType === "110/35 kV" && specializedPlot?.substationCapacityMw === 80, "Specialized road, easement, and substation fields were not persisted.");
   await request("/api/snapshots", { method: "POST", jar: userJar, expected: [405] });
   await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [405] });
   const scheduledRun = await request("/api/internal/snapshots/run", { method: "POST", headers: { authorization: `Bearer ${process.env.SNAPSHOT_CRON_SECRET}` }, json: { force: true } });

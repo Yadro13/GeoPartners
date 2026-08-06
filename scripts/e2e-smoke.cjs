@@ -776,7 +776,7 @@ async function expectDownload(page, action, extension, expected) {
       assert(tableGrids.length >= minimumTables, "DOCX contains the expected report tables");
       assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= minimumTables, "DOCX tables allow Word to auto-fit preferred widths to their content");
       if (expected.kind === "result") {
-        assert(tableGrids[0].length === 3 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "result DOCX candidate table uses the full page width");
+        assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "result DOCX candidate table uses the full page width and includes object parameters");
         assert(tableGrids[1].length === (expected.includeExpenses === false ? 2 : 3) && tableGrids[1][0] >= 4800, "result DOCX stage table prioritizes the stage description");
       } else {
         assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
