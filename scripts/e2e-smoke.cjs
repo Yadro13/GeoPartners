@@ -12,6 +12,11 @@ const reportLocales = {
   de: { heading: "Matrix des Phasenfortschritts", xlsxButton: "XLSX herunterladen", pdfButton: "PDF herunterladen", docxButton: "DOCX herunterladen", printButton: "Drucken", fileTitle: "Zusammenfassung der Grundstücke", xlsxTitle: "Bericht zum Fortschritt der Grundstücksphasen", matrixSheet: "Phasenmatrix", detailsSheet: "Details", dateFormat: "dd.mm.yyyy" },
   en: { heading: "Stage progress matrix", xlsxButton: "Download XLSX", pdfButton: "Download PDF", docxButton: "Download DOCX", printButton: "Print", fileTitle: "Land plot summary report", xlsxTitle: "Land plot stage progress report", matrixSheet: "Stage matrix", detailsSheet: "Details", dateFormat: "mm/dd/yyyy" },
 };
+const wtgReportLocales = {
+  uk: { kind: "wtg", viewButton: "За ВЕУ", plotsButton: "За ділянками", fileTitle: "Звіт за ВЕУ", xlsxTitle: "Звіт за ВЕУ", matrixSheet: "ВЕУ та етапи", detailsSheet: "Кандидати ВЕУ", dateFormat: "dd.mm.yyyy" },
+  de: { kind: "wtg", viewButton: "Nach WEA", plotsButton: "Nach Fläche", fileTitle: "WEA-Bericht", xlsxTitle: "WEA-Bericht", matrixSheet: "WEA und Phasen", detailsSheet: "WEA-Kandidaten", dateFormat: "dd.mm.yyyy" },
+  en: { kind: "wtg", viewButton: "By WTG", plotsButton: "By plot", fileTitle: "WTG report", xlsxTitle: "WTG report", matrixSheet: "WTGs and stages", detailsSheet: "WTG candidates", dateFormat: "mm/dd/yyyy" },
+};
 
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH });
@@ -41,6 +46,7 @@ const reportLocales = {
   await page.getByTitle("Ebenen").waitFor();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "German desktop workspace has no horizontal overflow");
   await page.getByTitle("Berichte").click();
+  await page.getByRole("button", { name: "Nach Fläche", exact: true }).click();
   await page.getByRole("heading", { name: "Matrix des Phasenfortschritts", exact: true }).waitFor();
   await page.getByRole("button", { name: "Excel herunterladen", exact: true }).waitFor();
   await page.goto(`${appOrigin}/sign-in`, { waitUntil: "domcontentloaded" });
@@ -135,12 +141,19 @@ const reportLocales = {
   await page.getByRole("heading", { name: "Зведений звіт" }).waitFor();
   await expectDownload(page, () => page.getByRole("button", { name: "CSV" }).click(), ".csv");
   console.log("stage=csv");
+  await page.getByRole("heading", { name: "Звіт за ВЕУ", exact: true }).waitFor();
+  assert((await page.locator(".report-matrix--wtg tbody tr").count()) === 1, "WTG report groups the main and alternative candidates into one row");
+  await page.getByText("6820982100:04:051:0020", { exact: true }).waitFor();
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf", wtgReportLocales.uk);
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx", wtgReportLocales.uk);
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", wtgReportLocales.uk);
+  console.log("stage=wtg-exports");
+  await page.getByRole("button", { name: "За ділянками", exact: true }).click();
+  await page.getByRole("heading", { name: reportLocales.uk.heading, exact: true }).waitFor();
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf", reportLocales.uk);
-  console.log("stage=pdf");
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx", reportLocales.uk);
-  console.log("stage=docx");
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", reportLocales.uk);
-  console.log("stage=xlsx-save-block");
+  console.log("stage=plot-exports");
   assert((await page.locator(".report-matrix tbody tr").count()) === 3, "desktop status report renders one matrix row per visible plot");
   assert((await page.locator(".report-matrix thead .report-matrix__stage").count()) === 15, "desktop status report renders the ordered stage directory");
   await page.setViewportSize({ width: 1920, height: 900 });
@@ -163,12 +176,19 @@ const reportLocales = {
   await verifyPrintReport(page, reportLocales.uk);
   for (const locale of ["de", "en"]) {
     const expected = reportLocales[locale];
+    const expectedWtg = wtgReportLocales[locale];
     await page.locator(".language-switcher select").selectOption(locale);
     await page.getByRole("heading", { name: expected.heading, exact: true }).waitFor();
     await expectDownload(page, () => page.getByRole("button", { name: expected.xlsxButton, exact: true }).click(), ".xlsx", expected);
     await expectDownload(page, () => page.getByRole("button", { name: expected.pdfButton, exact: true }).click(), ".pdf", expected);
     await expectDownload(page, () => page.getByRole("button", { name: expected.docxButton, exact: true }).click(), ".docx", expected);
     await verifyPrintReport(page, expected);
+    await page.getByRole("button", { name: expectedWtg.viewButton, exact: true }).click();
+    await page.getByRole("heading", { name: expectedWtg.fileTitle, exact: true }).waitFor();
+    await expectDownload(page, () => page.getByRole("button", { name: expected.xlsxButton, exact: true }).click(), ".xlsx", expectedWtg);
+    await expectDownload(page, () => page.getByRole("button", { name: expected.pdfButton, exact: true }).click(), ".pdf", expectedWtg);
+    await expectDownload(page, () => page.getByRole("button", { name: expected.docxButton, exact: true }).click(), ".docx", expectedWtg);
+    await page.getByRole("button", { name: expectedWtg.plotsButton, exact: true }).click();
   }
   await page.locator(".language-switcher select").selectOption("uk");
   await page.getByRole("heading", { name: reportLocales.uk.heading, exact: true }).waitFor();
@@ -459,6 +479,7 @@ const reportLocales = {
   await page.getByRole("dialog").getByRole("button", { name: "Закрити" }).click();
   await page.getByRole("button", { name: "Звіти", exact: true }).click();
   await page.getByRole("heading", { name: "Зведений звіт" }).waitFor();
+  await page.getByRole("button", { name: "За ділянками", exact: true }).click();
   assert((await page.locator(".mobile-stage-report__list article").count()) === 4, "mobile status report renders one row per visible plot");
   await page.getByText("Етап 1", { exact: true }).waitFor();
   assert((await page.locator(".mobile-stage-report__stage-value").count()) === 4, "mobile status report renders the selected stage as a dedicated column");
@@ -648,24 +669,35 @@ async function expectDownload(page, action, extension, expected) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(target);
     assert(workbook.worksheets.length === 2, "Excel report contains matrix and detail sheets");
-    assert(workbook.worksheets[0].rowCount >= 8, "Excel matrix contains plot rows and totals");
-    assert(workbook.worksheets[1].rowCount >= 46, "Excel detail sheet contains all plot-stage combinations");
+    if (expected?.kind === "wtg") {
+      assert(workbook.worksheets[0].rowCount >= 5, "WTG Excel contains grouped rows");
+      assert(workbook.worksheets[1].rowCount >= 3, "WTG Excel contains complete candidate details");
+    } else {
+      assert(workbook.worksheets[0].rowCount >= 8, "Excel matrix contains plot rows and totals");
+      assert(workbook.worksheets[1].rowCount >= 46, "Excel detail sheet contains all plot-stage combinations");
+    }
       if (expected) {
         assert(workbook.worksheets[0].name === expected.matrixSheet, `Excel matrix sheet is localized as ${expected.matrixSheet}`);
         assert(workbook.worksheets[1].name === expected.detailsSheet, `Excel details sheet is localized as ${expected.detailsSheet}`);
         assert(workbook.worksheets[0].getCell("A1").value === expected.xlsxTitle, `Excel title is localized as ${expected.xlsxTitle}`);
-        assert(workbook.worksheets[0].getCell("F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
+        assert(workbook.worksheets[0].getCell(expected.kind === "wtg" ? "H5" : "F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
       }
     } else if (extension === ".docx") {
       const archive = unzipSync(new Uint8Array(fs.readFileSync(target)));
       const documentXml = Buffer.from(archive["word/document.xml"]).toString("utf8");
       assert(documentXml.includes(expected.fileTitle), `DOCX title is localized as ${expected.fileTitle}`);
       const tableGrids = [...documentXml.matchAll(/<w:tblGrid>([\s\S]*?)<\/w:tblGrid>/g)].map((match) => [...match[1].matchAll(/<w:gridCol w:w="(\d+)"\s*\/>/g)].map((column) => Number(column[1])));
-      assert(tableGrids.length >= 4, "DOCX contains the plot table and per-plot stage tables");
-      assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= 4, "DOCX tables allow Word to auto-fit preferred widths to their content");
-      assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
-      assert(tableGrids[0][0] >= 2400 && tableGrids[0][1] >= 2400 && tableGrids[0][2] >= 1000, "DOCX plot columns have deliberate readable widths");
-      assert(tableGrids.slice(1).every((widths) => widths.length === 3 && widths[0] >= 4800 && widths[0] > widths[1] && widths[1] > widths[2]), "DOCX stage tables prioritize the stage description column");
+      const minimumTables = expected.kind === "wtg" ? 2 : 4;
+      assert(tableGrids.length >= minimumTables, "DOCX contains the expected report tables");
+      assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= minimumTables, "DOCX tables allow Word to auto-fit preferred widths to their content");
+      if (expected.kind === "wtg") {
+        assert(tableGrids[0].length === 3 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "WTG DOCX candidate table uses the full page width");
+        assert(tableGrids[1].length === 3 && tableGrids[1][0] >= 4800, "WTG DOCX stage table prioritizes the stage description");
+      } else {
+        assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
+        assert(tableGrids[0][0] >= 2400 && tableGrids[0][1] >= 2400 && tableGrids[0][2] >= 1000, "DOCX plot columns have deliberate readable widths");
+        assert(tableGrids.slice(1).every((widths) => widths.length === 3 && widths[0] >= 4800 && widths[0] > widths[1] && widths[1] > widths[2]), "DOCX stage tables prioritize the stage description column");
+      }
     } else if (extension === ".pdf") {
       const { PDFParse } = require("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(fs.readFileSync(target)) });

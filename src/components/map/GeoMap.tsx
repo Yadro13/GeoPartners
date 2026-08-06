@@ -29,7 +29,7 @@ function ManageViewport({ plots, selectedId }: { plots: PlotFeature[]; selectedI
     if (fitted.current) return;
     const bounds = plots.flatMap((feature) => feature.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]));
     if (bounds.length) {
-      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 15 });
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 15, animate: false });
       fitted.current = true;
     }
   }, [map, plots]);
@@ -43,7 +43,7 @@ function ManageViewport({ plots, selectedId }: { plots: PlotFeature[]; selectedI
     const points = selected.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
     const latitude = points.reduce((sum, [lat]) => sum + lat, 0) / points.length;
     const longitude = points.reduce((sum, [, lng]) => sum + lng, 0) / points.length;
-    map.panTo([latitude, longitude], { animate: true });
+    map.panTo([latitude, longitude], { animate: false });
   }, [map, plots, selectedId]);
 
   return null;

@@ -3,6 +3,7 @@ import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { defaultLocale, intlLocale, isAppLocale, type AppLocale } from "@/i18n/config";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
 import type { PlotFeature } from "@/components/workspace/types";
+import { wtgGroupPlots, type WtgReportGroup } from "@/lib/wtg-report";
 
 export type StatusReportRow = {
   plot: PlotFeature;
@@ -48,6 +49,40 @@ export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: 
   anchor.download = `geopartners-status-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+export async function exportWtgReportXlsx(groups: WtgReportGroup[], statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, categories: Record<string, CategoryDefinition> = {}) {
+  const locale = isAppLocale(requestedLocale) ? requestedLocale : defaultLocale;
+  const labels = xlsxLabels[locale];
+  const { Workbook } = await import("exceljs");
+  const workbook = new Workbook();
+  workbook.creator = "GeoPartners"; workbook.created = new Date(); workbook.modified = new Date(); workbook.subject = labels.wtgTitle;
+  const dateFormat = xlsxDateFormat(locale);
+  const sheet = workbook.addWorksheet(labels.wtgSheet, { views: [{ state: "frozen", xSplit: 7, ySplit: 4, topLeftCell: "H5", activeCell: "H5" }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  sheet.mergeCells(1, 1, 1, 7 + statuses.length); sheet.getCell(1, 1).value = labels.wtgTitle; sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
+  sheet.mergeCells(2, 1, 2, 7 + statuses.length); sheet.getCell(2, 1).value = `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`;
+  sheet.getRow(4).values = [labels.wtgNumber, labels.mainCadastral, labels.owner, labels.lessee, labels.alternatives, labels.finalWtgPlot, labels.totalExpenses, ...statuses.map(({ name }) => name)];
+  sheet.getRow(4).height = 74; styleHeader(sheet.getRow(4));
+  sheet.columns = [{ width: 13 }, { width: 25 }, { width: 28 }, { width: 28 }, { width: 34 }, { width: 25 }, { width: 16 }, ...statuses.map(() => ({ width: 15 }))];
+  groups.forEach((group, index) => {
+    const primary = group.primary?.properties;
+    const row = sheet.addRow([group.number, primary?.cadastralNumber ?? "", primary?.owner ?? "", primary?.lessee ?? "", group.alternativeCandidates.map(({ properties }) => `${properties.cadastralNumber}\n${properties.owner}\n${properties.lessee}`).join("\n\n"), group.finalPlots.map(({ properties }) => properties.cadastralNumber).join("\n"), group.totalCost, ...statuses.map(({ id }) => group.progress.has(id) ? new Date(group.progress.get(id)!.completedAt) : null)]);
+    row.alignment = { vertical: "top", wrapText: true }; row.getCell(7).numFmt = '#,##0.00 "UAH"'; row.height = Math.max(34, group.alternativeCandidates.length * 42);
+    statuses.forEach((_, statusIndex) => { const cell = row.getCell(8 + statusIndex); cell.numFmt = dateFormat.date; cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; if (cell.value) cell.fill = solidFill("FFE7F3EB"); });
+    if (index % 2 === 1) row.eachCell((cell) => { if (!cell.fill || (cell.fill as { type?: string }).type !== "pattern") cell.fill = solidFill("FFF8FAF9"); });
+  });
+  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + groups.length, column: 7 + statuses.length } };
+  sheet.eachRow((row, rowNumber) => row.eachCell({ includeEmpty: true }, (cell) => { if (rowNumber >= 4) cell.border = thinBorder(); }));
+
+  const candidates = workbook.addWorksheet(labels.wtgCandidatesSheet, { views: [{ state: "frozen", ySplit: 1 }] });
+  candidates.columns = [{ header: labels.wtgNumber, key: "wtg", width: 14 }, { header: labels.relationship, key: "relationship", width: 22 }, { header: labels.cadastralNumber, key: "cadastral", width: 25 }, { header: labels.category, key: "category", width: 22 }, { header: labels.owner, key: "owner", width: 34 }, { header: labels.lessee, key: "lessee", width: 34 }];
+  styleHeader(candidates.getRow(1)); candidates.getRow(1).height = 34;
+  for (const group of groups) for (const plot of wtgGroupPlots(group)) {
+    const relationship = group.mainCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.mainCandidate : group.alternativeCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.alternativeCandidate : group.finalPlots.some(({ properties }) => properties.id === plot.properties.id) ? labels.finalWtgPlot : labels.relatedPlot;
+    const row = candidates.addRow({ wtg: group.number, relationship, cadastral: plot.properties.cadastralNumber, category: categories[plot.properties.category]?.name ?? plot.properties.category, owner: plot.properties.owner, lessee: plot.properties.lessee }); row.alignment = { vertical: "top", wrapText: true };
+  }
+  candidates.autoFilter = { from: "A1", to: `F${Math.max(1, candidates.rowCount)}` }; candidates.eachRow((row) => row.eachCell({ includeEmpty: true }, (cell) => { cell.border = thinBorder(); }));
+  downloadWorkbook(workbook, `geopartners-wtg-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 type Workbook = InstanceType<(typeof import("exceljs"))["Workbook"]>;
@@ -201,8 +236,14 @@ function xlsxDateFormat(locale: AppLocale) {
     : { date: "dd.mm.yyyy", dateTime: "dd.mm.yyyy hh:mm" };
 }
 
+async function downloadWorkbook(workbook: Workbook, filename: string) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buffer as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); URL.revokeObjectURL(url);
+}
+
 const xlsxLabels = {
-  uk: { title: "Звіт про проходження етапів земельних ділянок", matrixSheet: "Матриця етапів", detailsSheet: "Деталі", generated: "Сформовано", page: "Сторінка", number: "№", plot: "Ділянка", cadastralNumber: "Кадастровий номер", category: "Категорія", totalExpenses: "Витрати разом", totals: "Разом", stageNumber: "№ етапу", stage: "Етап", completed: "Пройдено", completionDate: "Дата проходження", expenses: "Витрати", yes: "Так", no: "Ні", currencyNote: "Суми витрат наведено у гривнях (UAH)." },
-  de: { title: "Bericht zum Fortschritt der Grundstücksphasen", matrixSheet: "Phasenmatrix", detailsSheet: "Details", generated: "Erstellt", page: "Seite", number: "Nr.", plot: "Grundstück", cadastralNumber: "Katasternummer", category: "Kategorie", totalExpenses: "Gesamtausgaben", totals: "Gesamt", stageNumber: "Phasennr.", stage: "Phase", completed: "Abgeschlossen", completionDate: "Abschlussdatum", expenses: "Ausgaben", yes: "Ja", no: "Nein", currencyNote: "Die Ausgaben werden in ukrainischen Hrywnja (UAH) ausgewiesen." },
-  en: { title: "Land plot stage progress report", matrixSheet: "Stage matrix", detailsSheet: "Details", generated: "Generated", page: "Page", number: "No.", plot: "Plot", cadastralNumber: "Cadastral number", category: "Category", totalExpenses: "Total expenses", totals: "Total", stageNumber: "Stage no.", stage: "Stage", completed: "Completed", completionDate: "Completion date", expenses: "Expenses", yes: "Yes", no: "No", currencyNote: "Expenses are shown in Ukrainian hryvnia (UAH)." },
+  uk: { title: "Звіт про проходження етапів земельних ділянок", wtgTitle: "Звіт за ВЕУ", matrixSheet: "Матриця етапів", detailsSheet: "Деталі", wtgSheet: "ВЕУ та етапи", wtgCandidatesSheet: "Кандидати ВЕУ", generated: "Сформовано", page: "Сторінка", number: "№", plot: "Ділянка", cadastralNumber: "Кадастровий номер", category: "Категорія", totalExpenses: "Витрати разом", totals: "Разом", stageNumber: "№ етапу", stage: "Етап", completed: "Пройдено", completionDate: "Дата проходження", expenses: "Витрати", yes: "Так", no: "Ні", currencyNote: "Суми витрат наведено у гривнях (UAH).", wtgNumber: "№ ВЕУ", mainCadastral: "Основний кандидат", owner: "Власник", lessee: "Орендар", alternatives: "Альтернативні кандидати", finalWtgPlot: "Виділена ділянка ВЕУ", relationship: "Роль у групі", mainCandidate: "Основний кандидат", alternativeCandidate: "Альтернативний кандидат", relatedPlot: "Пов'язана ділянка" },
+  de: { title: "Bericht zum Fortschritt der Grundstücksphasen", wtgTitle: "WEA-Bericht", matrixSheet: "Phasenmatrix", detailsSheet: "Details", wtgSheet: "WEA und Phasen", wtgCandidatesSheet: "WEA-Kandidaten", generated: "Erstellt", page: "Seite", number: "Nr.", plot: "Grundstück", cadastralNumber: "Katasternummer", category: "Kategorie", totalExpenses: "Gesamtausgaben", totals: "Gesamt", stageNumber: "Phasennr.", stage: "Phase", completed: "Abgeschlossen", completionDate: "Abschlussdatum", expenses: "Ausgaben", yes: "Ja", no: "Nein", currencyNote: "Die Ausgaben werden in ukrainischen Hrywnja (UAH) ausgewiesen.", wtgNumber: "WEA-Nr.", mainCadastral: "Hauptkandidat", owner: "Eigentümer", lessee: "Pächter", alternatives: "Alternativkandidaten", finalWtgPlot: "Abgetrennte WEA-Fläche", relationship: "Rolle in der Gruppe", mainCandidate: "Hauptkandidat", alternativeCandidate: "Alternativkandidat", relatedPlot: "Verknüpfte Fläche" },
+  en: { title: "Land plot stage progress report", wtgTitle: "WTG report", matrixSheet: "Stage matrix", detailsSheet: "Details", wtgSheet: "WTGs and stages", wtgCandidatesSheet: "WTG candidates", generated: "Generated", page: "Page", number: "No.", plot: "Plot", cadastralNumber: "Cadastral number", category: "Category", totalExpenses: "Total expenses", totals: "Total", stageNumber: "Stage no.", stage: "Stage", completed: "Completed", completionDate: "Completion date", expenses: "Expenses", yes: "Yes", no: "No", currencyNote: "Expenses are shown in Ukrainian hryvnia (UAH).", wtgNumber: "WTG no.", mainCadastral: "Main candidate", owner: "Owner", lessee: "Lessee", alternatives: "Alternative candidates", finalWtgPlot: "Allocated WTG plot", relationship: "Group role", mainCandidate: "Main candidate", alternativeCandidate: "Alternative candidate", relatedPlot: "Related plot" },
 } satisfies Record<AppLocale, Record<string, string>>;

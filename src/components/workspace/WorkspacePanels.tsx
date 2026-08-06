@@ -7,12 +7,13 @@ import { ArrowDown, ArrowUp, CircleCheck, Coins, Download, Eye, EyeOff, FileJson
 import { authClient } from "@/lib/auth-client";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
-import { exportReportDocx, exportReportPdf, printReport, summarizePlots } from "@/lib/report-export";
-import { buildStatusReportRows, exportStatusReportXlsx } from "@/lib/status-report-export";
+import { exportReportDocx, exportReportPdf, exportWtgReportDocx, exportWtgReportPdf, printReport, summarizePlots } from "@/lib/report-export";
+import { buildStatusReportRows, exportStatusReportXlsx, exportWtgReportXlsx } from "@/lib/status-report-export";
+import { buildWtgReportGroups } from "@/lib/wtg-report";
 import type { BaseMapId, PlotFeature, WorkspaceActions, WorkspaceUser } from "./types";
 import type { DataWorkspace } from "@/lib/data-workspace";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { StatusReport } from "./StatusReport";
+import { StatusReport, type ReportView } from "./StatusReport";
 
 export function LayersPanel({ categories, baseMap, actions, canManage }: { categories: Record<string, CategoryDefinition>; baseMap: BaseMapId; actions: WorkspaceActions; canManage: boolean }) {
   const t = useTranslations("panels");
@@ -53,18 +54,20 @@ export function ReportsPanel({ plots, categories, plotStatuses, actions }: { plo
   const locale = useLocale();
   const summary = useMemo(() => summarizePlots(plots, categories), [categories, plots]);
   const statusRows = useMemo(() => buildStatusReportRows(plots, categories), [categories, plots]);
+  const wtgGroups = useMemo(() => buildWtgReportGroups(plots, categories), [categories, plots]);
+  const [reportView, setReportView] = useState<ReportView>("wtg");
   const [busy, setBusy] = useState<"xlsx" | "pdf" | "docx" | null>(null);
   const run = async (type: "xlsx" | "pdf" | "docx") => {
     setBusy(type);
     try {
-      if (type === "xlsx") await exportStatusReportXlsx(statusRows, plotStatuses, locale);
-      else if (type === "pdf") await exportReportPdf(summary, locale, plotStatuses);
-      else await exportReportDocx(summary, locale, plotStatuses);
+      if (type === "xlsx") { if (reportView === "wtg") await exportWtgReportXlsx(wtgGroups, plotStatuses, locale, categories); else await exportStatusReportXlsx(statusRows, plotStatuses, locale); }
+      else if (type === "pdf") { if (reportView === "wtg") await exportWtgReportPdf(wtgGroups, locale, plotStatuses); else await exportReportPdf(summary, locale, plotStatuses); }
+      else { if (reportView === "wtg") await exportWtgReportDocx(wtgGroups, locale, plotStatuses); else await exportReportDocx(summary, locale, plotStatuses); }
     } finally { setBusy(null); }
   };
   return <section className="workspace-page report-page"><header className="workspace-page__header"><div><span className="eyebrow">{t("currentSet")}</span><h1>{t("summaryReport")}</h1></div><div className="page-actions"><button className="command-button" type="button" onClick={actions.exportCsv}><FileSpreadsheet size={17} />CSV</button><button className="command-button" type="button" onClick={actions.exportGeoJson}><FileJson size={17} />GeoJSON</button></div></header>
     <div className="report-metrics"><article><strong>{format.number(summary.count)}</strong><span>{t("visiblePlots")}</span></article><article><strong>{format.number(summary.totalArea, { maximumFractionDigits: 4 })}</strong><span>{t("totalHectares")}</span></article><article><strong>{format.number(summary.byCategory.length)}</strong><span>{t("activeCategories")}</span></article><article><strong>{format.number(summary.totalStageCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</strong><span><Coins size={14} />{t("totalStageExpenses")}</span></article></div>
-    <StatusReport plots={plots} categories={categories} statuses={plotStatuses} />
+    <StatusReport plots={plots} categories={categories} statuses={plotStatuses} view={reportView} onViewChange={setReportView} />
     <div className="report-layout"><section><h2>{t("byCategory")}</h2><div className="report-category-list">{summary.byCategory.map((item) => <div key={item.id}><span className="category-line__swatch" style={{ background: item.color }} /><strong>{item.name}</strong><span>{t("pieces", { count: item.count })}</span><span>{t("hectares", { area: format.number(item.area, { maximumFractionDigits: 4 }) })}</span></div>)}</div></section>
       <aside className="report-export"><h2>{t("saveReport")}</h2><p>{t("reportNote")}</p><button className="command-button command-button--primary" disabled={Boolean(busy) || !statusRows.length} type="button" onClick={() => run("xlsx")}><FileSpreadsheet size={17} />{busy === "xlsx" ? t("generating") : t("downloadXlsx")}</button><button className="command-button" disabled={Boolean(busy)} type="button" onClick={() => run("pdf")}><Download size={17} />{busy === "pdf" ? t("generating") : t("downloadPdf")}</button><button className="command-button" disabled={Boolean(busy)} type="button" onClick={() => run("docx")}><FileText size={17} />{busy === "docx" ? t("generating") : t("downloadDocx")}</button><button className="command-button" type="button" onClick={printReport}><Printer size={17} />{t("print")}</button></aside>
     </div>
