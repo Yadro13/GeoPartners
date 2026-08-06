@@ -3,7 +3,8 @@ import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { defaultLocale, intlLocale, isAppLocale, type AppLocale } from "@/i18n/config";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
 import type { PlotFeature } from "@/components/workspace/types";
-import { wtgGroupPlots, type WtgReportGroup } from "@/lib/wtg-report";
+import type { PlotResultType } from "@/lib/plot-result-links";
+import { resultGroupPlots, type ResultReportGroup } from "@/lib/result-report";
 
 export type StatusReportRow = {
   plot: PlotFeature;
@@ -51,17 +52,18 @@ export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: 
   URL.revokeObjectURL(url);
 }
 
-export async function exportWtgReportXlsx(groups: WtgReportGroup[], statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, categories: Record<string, CategoryDefinition> = {}) {
+export async function exportResultReportXlsx(groups: ResultReportGroup[], type: PlotResultType, statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, categories: Record<string, CategoryDefinition> = {}) {
   const locale = isAppLocale(requestedLocale) ? requestedLocale : defaultLocale;
   const labels = xlsxLabels[locale];
+  const resultLabels = xlsxResultLabels[locale][type];
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
-  workbook.creator = "GeoPartners"; workbook.created = new Date(); workbook.modified = new Date(); workbook.subject = labels.wtgTitle;
+  workbook.creator = "GeoPartners"; workbook.created = new Date(); workbook.modified = new Date(); workbook.subject = resultLabels.title;
   const dateFormat = xlsxDateFormat(locale);
-  const sheet = workbook.addWorksheet(labels.wtgSheet, { views: [{ state: "frozen", xSplit: 7, ySplit: 4, topLeftCell: "H5", activeCell: "H5" }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  sheet.mergeCells(1, 1, 1, 7 + statuses.length); sheet.getCell(1, 1).value = labels.wtgTitle; sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
+  const sheet = workbook.addWorksheet(resultLabels.sheet, { views: [{ state: "frozen", xSplit: 7, ySplit: 4, topLeftCell: "H5", activeCell: "H5" }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  sheet.mergeCells(1, 1, 1, 7 + statuses.length); sheet.getCell(1, 1).value = resultLabels.title; sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
   sheet.mergeCells(2, 1, 2, 7 + statuses.length); sheet.getCell(2, 1).value = `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`;
-  sheet.getRow(4).values = [labels.wtgNumber, labels.mainCadastral, labels.owner, labels.lessee, labels.alternatives, labels.finalWtgPlot, labels.totalExpenses, ...statuses.map(({ name }) => name)];
+  sheet.getRow(4).values = [resultLabels.number, labels.mainCadastral, labels.owner, labels.lessee, labels.alternatives, resultLabels.finalPlot, labels.totalExpenses, ...statuses.map(({ name }) => name)];
   sheet.getRow(4).height = 74; styleHeader(sheet.getRow(4));
   sheet.columns = [{ width: 13 }, { width: 25 }, { width: 28 }, { width: 28 }, { width: 34 }, { width: 25 }, { width: 16 }, ...statuses.map(() => ({ width: 15 }))];
   groups.forEach((group, index) => {
@@ -74,15 +76,15 @@ export async function exportWtgReportXlsx(groups: WtgReportGroup[], statuses: Pl
   sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + groups.length, column: 7 + statuses.length } };
   sheet.eachRow((row, rowNumber) => row.eachCell({ includeEmpty: true }, (cell) => { if (rowNumber >= 4) cell.border = thinBorder(); }));
 
-  const candidates = workbook.addWorksheet(labels.wtgCandidatesSheet, { views: [{ state: "frozen", ySplit: 1 }] });
-  candidates.columns = [{ header: labels.wtgNumber, key: "wtg", width: 14 }, { header: labels.relationship, key: "relationship", width: 22 }, { header: labels.cadastralNumber, key: "cadastral", width: 25 }, { header: labels.category, key: "category", width: 22 }, { header: labels.owner, key: "owner", width: 34 }, { header: labels.lessee, key: "lessee", width: 34 }];
+  const candidates = workbook.addWorksheet(resultLabels.candidatesSheet, { views: [{ state: "frozen", ySplit: 1 }] });
+  candidates.columns = [{ header: resultLabels.number, key: "result", width: 14 }, { header: labels.relationship, key: "relationship", width: 22 }, { header: labels.cadastralNumber, key: "cadastral", width: 25 }, { header: labels.category, key: "category", width: 22 }, { header: labels.owner, key: "owner", width: 34 }, { header: labels.lessee, key: "lessee", width: 34 }];
   styleHeader(candidates.getRow(1)); candidates.getRow(1).height = 34;
-  for (const group of groups) for (const plot of wtgGroupPlots(group)) {
-    const relationship = group.mainCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.mainCandidate : group.alternativeCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.alternativeCandidate : group.finalPlots.some(({ properties }) => properties.id === plot.properties.id) ? labels.finalWtgPlot : labels.relatedPlot;
-    const row = candidates.addRow({ wtg: group.number, relationship, cadastral: plot.properties.cadastralNumber, category: categories[plot.properties.category]?.name ?? plot.properties.category, owner: plot.properties.owner, lessee: plot.properties.lessee }); row.alignment = { vertical: "top", wrapText: true };
+  for (const group of groups) for (const plot of resultGroupPlots(group)) {
+    const relationship = group.mainCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.mainCandidate : group.alternativeCandidates.some(({ properties }) => properties.id === plot.properties.id) ? labels.alternativeCandidate : group.finalPlots.some(({ properties }) => properties.id === plot.properties.id) ? resultLabels.finalPlot : labels.relatedPlot;
+    const row = candidates.addRow({ result: group.number, relationship, cadastral: plot.properties.cadastralNumber, category: categories[plot.properties.category]?.name ?? plot.properties.category, owner: plot.properties.owner, lessee: plot.properties.lessee }); row.alignment = { vertical: "top", wrapText: true };
   }
   candidates.autoFilter = { from: "A1", to: `F${Math.max(1, candidates.rowCount)}` }; candidates.eachRow((row) => row.eachCell({ includeEmpty: true }, (cell) => { cell.border = thinBorder(); }));
-  downloadWorkbook(workbook, `geopartners-wtg-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  downloadWorkbook(workbook, `geopartners-${type}-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 type Workbook = InstanceType<(typeof import("exceljs"))["Workbook"]>;
@@ -247,3 +249,24 @@ const xlsxLabels = {
   de: { title: "Bericht zum Fortschritt der Grundstücksphasen", wtgTitle: "WEA-Bericht", matrixSheet: "Phasenmatrix", detailsSheet: "Details", wtgSheet: "WEA und Phasen", wtgCandidatesSheet: "WEA-Kandidaten", generated: "Erstellt", page: "Seite", number: "Nr.", plot: "Grundstück", cadastralNumber: "Katasternummer", category: "Kategorie", totalExpenses: "Gesamtausgaben", totals: "Gesamt", stageNumber: "Phasennr.", stage: "Phase", completed: "Abgeschlossen", completionDate: "Abschlussdatum", expenses: "Ausgaben", yes: "Ja", no: "Nein", currencyNote: "Die Ausgaben werden in ukrainischen Hrywnja (UAH) ausgewiesen.", wtgNumber: "WEA-Nr.", mainCadastral: "Hauptkandidat", owner: "Eigentümer", lessee: "Pächter", alternatives: "Alternativkandidaten", finalWtgPlot: "Abgetrennte WEA-Fläche", relationship: "Rolle in der Gruppe", mainCandidate: "Hauptkandidat", alternativeCandidate: "Alternativkandidat", relatedPlot: "Verknüpfte Fläche" },
   en: { title: "Land plot stage progress report", wtgTitle: "WTG report", matrixSheet: "Stage matrix", detailsSheet: "Details", wtgSheet: "WTGs and stages", wtgCandidatesSheet: "WTG candidates", generated: "Generated", page: "Page", number: "No.", plot: "Plot", cadastralNumber: "Cadastral number", category: "Category", totalExpenses: "Total expenses", totals: "Total", stageNumber: "Stage no.", stage: "Stage", completed: "Completed", completionDate: "Completion date", expenses: "Expenses", yes: "Yes", no: "No", currencyNote: "Expenses are shown in Ukrainian hryvnia (UAH).", wtgNumber: "WTG no.", mainCadastral: "Main candidate", owner: "Owner", lessee: "Lessee", alternatives: "Alternative candidates", finalWtgPlot: "Allocated WTG plot", relationship: "Group role", mainCandidate: "Main candidate", alternativeCandidate: "Alternative candidate", relatedPlot: "Related plot" },
 } satisfies Record<AppLocale, Record<string, string>>;
+
+const xlsxResultLabels: Record<AppLocale, Record<PlotResultType, { title: string; sheet: string; candidatesSheet: string; number: string; finalPlot: string }>> = {
+  uk: {
+    wtg: { title: "Звіт за ВЕУ", sheet: "ВЕУ та етапи", candidatesSheet: "Кандидати ВЕУ", number: "№ ВЕУ", finalPlot: "Виділена ділянка ВЕУ" },
+    road: { title: "Звіт за дорогами", sheet: "Дороги та етапи", candidatesSheet: "Кандидати доріг", number: "№ дороги", finalPlot: "Ділянка дороги" },
+    servitude: { title: "Звіт за сервітутами", sheet: "Сервітути та етапи", candidatesSheet: "Кандидати сервітутів", number: "№ сервітуту", finalPlot: "Ділянка сервітуту" },
+    substation: { title: "Звіт за підстанціями", sheet: "Підстанції та етапи", candidatesSheet: "Кандидати підстанцій", number: "№ підстанції", finalPlot: "Ділянка підстанції" },
+  },
+  de: {
+    wtg: { title: "WEA-Bericht", sheet: "WEA und Phasen", candidatesSheet: "WEA-Kandidaten", number: "WEA-Nr.", finalPlot: "Abgetrennte WEA-Fläche" },
+    road: { title: "Straßenbericht", sheet: "Straßen und Phasen", candidatesSheet: "Straßenkandidaten", number: "Straßen-Nr.", finalPlot: "Straßenfläche" },
+    servitude: { title: "Dienstbarkeitsbericht", sheet: "Dienstbarkeiten", candidatesSheet: "Dienstbarkeitskandidaten", number: "Dienstbarkeits-Nr.", finalPlot: "Dienstbarkeitsfläche" },
+    substation: { title: "Umspannwerksbericht", sheet: "Umspannwerke und Phasen", candidatesSheet: "Umspannwerkkandidaten", number: "Umspannwerks-Nr.", finalPlot: "Umspannwerksfläche" },
+  },
+  en: {
+    wtg: { title: "WTG report", sheet: "WTGs and stages", candidatesSheet: "WTG candidates", number: "WTG no.", finalPlot: "Allocated WTG plot" },
+    road: { title: "Road report", sheet: "Roads and stages", candidatesSheet: "Road candidates", number: "Road no.", finalPlot: "Road plot" },
+    servitude: { title: "Easement report", sheet: "Easements and stages", candidatesSheet: "Easement candidates", number: "Easement no.", finalPlot: "Easement plot" },
+    substation: { title: "Substation report", sheet: "Substations and stages", candidatesSheet: "Substation candidates", number: "Substation no.", finalPlot: "Substation plot" },
+  },
+};

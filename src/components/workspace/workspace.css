@@ -962,6 +962,8 @@
 
 .status-report__view .segmented-control {
   border: 1px solid #b8c5bd;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(92px, auto));
   padding: 2px;
 }
 
@@ -2732,11 +2734,16 @@
   }
 
   .status-report__view .segmented-control {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
   .status-report__view button {
-    flex: 1;
+    min-width: 0;
+  }
+
+  .status-report__view button:last-child {
+    grid-column: 1 / -1;
   }
 
   .status-report__filters .status-report__desktop-filter,

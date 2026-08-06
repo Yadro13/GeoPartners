@@ -13,9 +13,18 @@ const reportLocales = {
   en: { heading: "Stage progress matrix", xlsxButton: "Download XLSX", pdfButton: "Download PDF", docxButton: "Download DOCX", printButton: "Print", fileTitle: "Land plot summary report", xlsxTitle: "Land plot stage progress report", matrixSheet: "Stage matrix", detailsSheet: "Details", dateFormat: "mm/dd/yyyy" },
 };
 const wtgReportLocales = {
-  uk: { kind: "wtg", viewButton: "За ВЕУ", plotsButton: "За ділянками", fileTitle: "Звіт за ВЕУ", xlsxTitle: "Звіт за ВЕУ", matrixSheet: "ВЕУ та етапи", detailsSheet: "Кандидати ВЕУ", dateFormat: "dd.mm.yyyy" },
-  de: { kind: "wtg", viewButton: "Nach WEA", plotsButton: "Nach Fläche", fileTitle: "WEA-Bericht", xlsxTitle: "WEA-Bericht", matrixSheet: "WEA und Phasen", detailsSheet: "WEA-Kandidaten", dateFormat: "dd.mm.yyyy" },
-  en: { kind: "wtg", viewButton: "By WTG", plotsButton: "By plot", fileTitle: "WTG report", xlsxTitle: "WTG report", matrixSheet: "WTGs and stages", detailsSheet: "WTG candidates", dateFormat: "mm/dd/yyyy" },
+  uk: { kind: "result", viewButton: "За ВЕУ", plotsButton: "За ділянками", fileTitle: "Звіт за ВЕУ", xlsxTitle: "Звіт за ВЕУ", matrixSheet: "ВЕУ та етапи", detailsSheet: "Кандидати ВЕУ", dateFormat: "dd.mm.yyyy" },
+  de: { kind: "result", viewButton: "Nach WEA", plotsButton: "Nach Fläche", fileTitle: "WEA-Bericht", xlsxTitle: "WEA-Bericht", matrixSheet: "WEA und Phasen", detailsSheet: "WEA-Kandidaten", dateFormat: "dd.mm.yyyy" },
+  en: { kind: "result", viewButton: "By WTG", plotsButton: "By plot", fileTitle: "WTG report", xlsxTitle: "WTG report", matrixSheet: "WTGs and stages", detailsSheet: "WTG candidates", dateFormat: "mm/dd/yyyy" },
+};
+const additionalResultReportsUk = [
+  { kind: "result", type: "road", viewButton: "За дорогами", fileTitle: "Звіт за дорогами", xlsxTitle: "Звіт за дорогами", matrixSheet: "Дороги та етапи", detailsSheet: "Кандидати доріг", dateFormat: "dd.mm.yyyy" },
+  { kind: "result", type: "servitude", viewButton: "За сервітутами", fileTitle: "Звіт за сервітутами", xlsxTitle: "Звіт за сервітутами", matrixSheet: "Сервітути та етапи", detailsSheet: "Кандидати сервітутів", dateFormat: "dd.mm.yyyy" },
+  { kind: "result", type: "substation", viewButton: "За підстанціями", fileTitle: "Звіт за підстанціями", xlsxTitle: "Звіт за підстанціями", matrixSheet: "Підстанції та етапи", detailsSheet: "Кандидати підстанцій", dateFormat: "dd.mm.yyyy" },
+];
+const additionalResultViews = {
+  de: [{ button: "Nach Straße", title: "Straßenbericht" }, { button: "Nach Dienstbarkeit", title: "Dienstbarkeitsbericht" }, { button: "Nach Umspannwerk", title: "Umspannwerksbericht" }],
+  en: [{ button: "By road", title: "Road report" }, { button: "By easement", title: "Easement report" }, { button: "By substation", title: "Substation report" }],
 };
 
 (async () => {
@@ -114,6 +123,17 @@ const wtgReportLocales = {
   await page.waitForSelector(".leaflet-overlay-pane path");
   assert((await page.locator(".leaflet-overlay-pane path").count()) === 3, "desktop map renders three plots");
   assert((await page.locator('.desktop-rail button[title="Користувачі"]').count()) === 1, "administrator navigation exposes user management as a workspace section");
+  await page.evaluate(() => {
+    const key = "geopartners-preview";
+    const state = JSON.parse(localStorage.getItem(key) || "{}");
+    const sharedLinks = [{ type: "road", number: "R-2" }, { type: "servitude", number: "S-3" }, { type: "substation", number: "PS-1" }];
+    state.plots = state.plots?.map((plot) => ["6820982100:04:051:0019", "6820982100:04:051:0020"].includes(plot.properties.cadastralNumber)
+      ? { ...plot, properties: { ...plot.properties, resultLinks: [...(plot.properties.resultLinks || []), ...sharedLinks] } }
+      : plot);
+    localStorage.setItem(key, JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".leaflet-overlay-pane path");
   console.log("stage=map");
   await page.getByTitle("Сповіщення").click();
   await page.getByText("Черга сповіщень працює штатно", { exact: true }).waitFor();
@@ -148,6 +168,18 @@ const wtgReportLocales = {
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx", wtgReportLocales.uk);
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", wtgReportLocales.uk);
   console.log("stage=wtg-exports");
+  for (const expected of additionalResultReportsUk) {
+    await page.getByRole("button", { name: expected.viewButton, exact: true }).click();
+    await page.getByRole("heading", { name: expected.fileTitle, exact: true }).waitFor();
+    const resultRows = page.locator(`.report-matrix--result[data-result-type="${expected.type}"] tbody tr`);
+    assert((await resultRows.count()) === 1, `${expected.type} report groups linked candidates into one row`);
+    const resultText = await resultRows.first().innerText();
+    assert(resultText.includes("6820982100:04:051:0019") && resultText.includes("6820982100:04:051:0020"), `${expected.type} report shows main and alternative candidates`);
+    await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf", expected);
+    await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX" }).click(), ".docx", expected);
+    await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", expected);
+  }
+  console.log("stage=additional-result-exports");
   await page.getByRole("button", { name: "За ділянками", exact: true }).click();
   await page.getByRole("heading", { name: reportLocales.uk.heading, exact: true }).waitFor();
   await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF" }).click(), ".pdf", reportLocales.uk);
@@ -188,6 +220,10 @@ const wtgReportLocales = {
     await expectDownload(page, () => page.getByRole("button", { name: expected.xlsxButton, exact: true }).click(), ".xlsx", expectedWtg);
     await expectDownload(page, () => page.getByRole("button", { name: expected.pdfButton, exact: true }).click(), ".pdf", expectedWtg);
     await expectDownload(page, () => page.getByRole("button", { name: expected.docxButton, exact: true }).click(), ".docx", expectedWtg);
+    for (const resultView of additionalResultViews[locale]) {
+      await page.getByRole("button", { name: resultView.button, exact: true }).click();
+      await page.getByRole("heading", { name: resultView.title, exact: true }).waitFor();
+    }
     await page.getByRole("button", { name: expectedWtg.plotsButton, exact: true }).click();
   }
   await page.locator(".language-switcher select").selectOption("uk");
@@ -683,9 +719,9 @@ async function expectDownload(page, action, extension, expected) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(target);
     assert(workbook.worksheets.length === 2, "Excel report contains matrix and detail sheets");
-    if (expected?.kind === "wtg") {
-      assert(workbook.worksheets[0].rowCount >= 5, "WTG Excel contains grouped rows");
-      assert(workbook.worksheets[1].rowCount >= 3, "WTG Excel contains complete candidate details");
+    if (expected?.kind === "result") {
+      assert(workbook.worksheets[0].rowCount >= 5, "result Excel contains grouped rows");
+      assert(workbook.worksheets[1].rowCount >= 3, "result Excel contains complete candidate details");
     } else {
       assert(workbook.worksheets[0].rowCount >= 8, "Excel matrix contains plot rows and totals");
       assert(workbook.worksheets[1].rowCount >= 46, "Excel detail sheet contains all plot-stage combinations");
@@ -694,19 +730,19 @@ async function expectDownload(page, action, extension, expected) {
         assert(workbook.worksheets[0].name === expected.matrixSheet, `Excel matrix sheet is localized as ${expected.matrixSheet}`);
         assert(workbook.worksheets[1].name === expected.detailsSheet, `Excel details sheet is localized as ${expected.detailsSheet}`);
         assert(workbook.worksheets[0].getCell("A1").value === expected.xlsxTitle, `Excel title is localized as ${expected.xlsxTitle}`);
-        assert(workbook.worksheets[0].getCell(expected.kind === "wtg" ? "H5" : "F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
+        assert(workbook.worksheets[0].getCell(expected.kind === "result" ? "H5" : "F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
       }
     } else if (extension === ".docx") {
       const archive = unzipSync(new Uint8Array(fs.readFileSync(target)));
       const documentXml = Buffer.from(archive["word/document.xml"]).toString("utf8");
       assert(documentXml.includes(expected.fileTitle), `DOCX title is localized as ${expected.fileTitle}`);
       const tableGrids = [...documentXml.matchAll(/<w:tblGrid>([\s\S]*?)<\/w:tblGrid>/g)].map((match) => [...match[1].matchAll(/<w:gridCol w:w="(\d+)"\s*\/>/g)].map((column) => Number(column[1])));
-      const minimumTables = expected.kind === "wtg" ? 2 : 4;
+      const minimumTables = expected.kind === "result" ? 2 : 4;
       assert(tableGrids.length >= minimumTables, "DOCX contains the expected report tables");
       assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= minimumTables, "DOCX tables allow Word to auto-fit preferred widths to their content");
-      if (expected.kind === "wtg") {
-        assert(tableGrids[0].length === 3 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "WTG DOCX candidate table uses the full page width");
-        assert(tableGrids[1].length === 3 && tableGrids[1][0] >= 4800, "WTG DOCX stage table prioritizes the stage description");
+      if (expected.kind === "result") {
+        assert(tableGrids[0].length === 3 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "result DOCX candidate table uses the full page width");
+        assert(tableGrids[1].length === 3 && tableGrids[1][0] >= 4800, "result DOCX stage table prioritizes the stage description");
       } else {
         assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
         assert(tableGrids[0][0] >= 2400 && tableGrids[0][1] >= 2400 && tableGrids[0][2] >= 1000, "DOCX plot columns have deliberate readable widths");
