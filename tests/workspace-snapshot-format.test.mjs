@@ -45,3 +45,18 @@ test("produces a stable integrity hash and detects content changes", () => {
   assert.equal(hashWorkspaceSnapshot(payload), hashWorkspaceSnapshot(same));
   assert.notEqual(hashWorkspaceSnapshot(payload), hashWorkspaceSnapshot(changed));
 });
+
+test("keeps the integrity hash stable after PostgreSQL JSONB reorders object keys", () => {
+  const categories = { default: { name: "Default", description: "", color: "#000000", visible: true, systemRole: "default" } };
+  const plotStatuses = [{ id: "status-1", name: "Stage 1" }];
+  const payload = buildWorkspaceSnapshotPayload({ workspace: "production", capturedAt: "2026-07-31T20:00:00.000Z", categories, plotStatuses, plots: [plot] });
+  const samePayloadWithDifferentInsertionOrder = {
+    plots: payload.plots.map((item) => ({ properties: Object.fromEntries(Object.entries(item.properties).reverse()), geometry: { coordinates: item.geometry.coordinates, type: item.geometry.type }, type: item.type })),
+    plotStatuses: payload.plotStatuses.map((status) => ({ name: status.name, id: status.id })),
+    categories: Object.fromEntries(Object.entries(payload.categories).map(([id, category]) => [id, Object.fromEntries(Object.entries(category).reverse())])),
+    capturedAt: payload.capturedAt,
+    workspace: payload.workspace,
+    formatVersion: payload.formatVersion,
+  };
+  assert.equal(hashWorkspaceSnapshot(samePayloadWithDifferentInsertionOrder), hashWorkspaceSnapshot(payload));
+});
