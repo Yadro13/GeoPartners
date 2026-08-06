@@ -85,6 +85,13 @@
       "when": 1786016017705,
       "tag": "0011_one_result_number_per_type",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786018225137,
+      "tag": "0012_workspace_snapshots",
+      "breakpoints": true
     }
   ]
 }

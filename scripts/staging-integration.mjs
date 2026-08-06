@@ -35,6 +35,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL });
 const serverOutput = [];
 let child;
 let databaseConnected = false;
+let snapshotId;
 
 class CookieJar {
   cookies = new Map();
@@ -368,13 +369,31 @@ async function run() {
   await request("/api/plots", { method: "POST", jar: adminJar, expected: [201], json: testPlot() });
   const sandboxPlots = await request("/api/plots", { jar: userJar });
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");
+  await request("/api/snapshots", { method: "POST", jar: userJar, expected: [403] });
+  const capturedSnapshot = await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [201] });
+  snapshotId = capturedSnapshot.payload.id;
+  assert(snapshotId && capturedSnapshot.payload.workspace === "sandbox" && capturedSnapshot.payload.plotCount >= 1, "Administrator snapshot metadata is invalid.");
+  const snapshotList = await request("/api/snapshots", { jar: userJar });
+  assert(snapshotList.payload.items?.some((item) => item.id === snapshotId), "Approved user cannot list snapshots in the active workspace.");
+  const snapshotDetail = await request(`/api/snapshots/${snapshotId}`, { jar: userJar });
+  assert(snapshotDetail.payload.payload?.plots?.some((item) => item.properties?.id === plotId), "Snapshot payload does not contain the captured plot.");
+  let immutableUpdateRejected = false;
+  try {
+    await client.query("update workspace_snapshot set plot_count = plot_count + 1 where id = $1", [snapshotId]);
+  } catch (error) {
+    immutableUpdateRejected = String(error?.message ?? error).includes("workspace snapshots are immutable");
+  }
+  assert(immutableUpdateRejected, "Database allowed an existing workspace snapshot to be modified.");
   await request("/api/plots", { method: "POST", jar: userJar, expected: [403], json: testPlot("Read-only create attempt") });
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, expected: [403], json: testPlot("Read-only update attempt") });
 
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "production" } });
   const productionPlots = await request("/api/plots", { jar: adminJar });
   assert(Array.isArray(productionPlots.payload) && !productionPlots.payload.some((item) => item.properties?.id === plotId), "Sandbox plot leaked into the production workspace.");
+  const productionSnapshots = await request("/api/snapshots", { jar: adminJar });
+  assert(!productionSnapshots.payload.items?.some((item) => item.id === snapshotId), "Sandbox snapshot leaked into the production workspace.");
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
+  logStep("workspace snapshot capture, read access, immutability and isolation passed");
 
   await request(`/api/admin/users/${applicant.id}`, {
     method: "PATCH",
@@ -461,6 +480,7 @@ async function cleanup() {
     try {
       const users = await client.query(`select id from "user" where email = any($1::text[])`, [testEmails]);
       const userIds = users.rows.map((row) => row.id);
+      if (snapshotId) await client.query("delete from workspace_snapshot where id = $1", [snapshotId]);
       await client.query(
         `delete from plot_version
           where plot_id = $1
@@ -485,8 +505,9 @@ async function cleanup() {
         `select
            (select count(*) from "user" where email = any($1::text[]))::int as users,
            (select count(*) from plot where id = $2)::int as plots,
-           (select count(*) from audit_log where entity_id = $2)::int as audits`,
-        [testEmails, plotId],
+           (select count(*) from audit_log where entity_id = $2)::int as audits,
+           (select count(*) from workspace_snapshot where id = $3)::int as snapshots`,
+        [testEmails, plotId, snapshotId],
       );
       assert(Object.values(residue.rows[0]).every((value) => value === 0), `Database cleanup left residue: ${JSON.stringify(residue.rows[0])}`);
       logStep("temporary database records were removed");

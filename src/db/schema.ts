@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { CategorySystemRole } from "@/data/demo";
 import type { PlotResultLink } from "@/lib/plot-result-links";
+import type { WorkspaceSnapshotPayload, WorkspaceSnapshotSource } from "@/lib/workspace-snapshot-format";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const userAccessLevelEnum = pgEnum("user_access_level", ["read", "edit"]);
@@ -227,11 +228,30 @@ export const plotVersion = pgTable(
   ],
 );
 
+export const workspaceSnapshot = pgTable(
+  "workspace_snapshot",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspace: dataWorkspaceEnum("workspace").default("production").notNull(),
+    source: text("source").$type<WorkspaceSnapshotSource>().default("manual").notNull(),
+    formatVersion: integer("format_version").default(1).notNull(),
+    payload: jsonb("payload").$type<WorkspaceSnapshotPayload>().notNull(),
+    contentHash: text("content_hash").notNull(),
+    plotCount: integer("plot_count").notNull(),
+    categoryCount: integer("category_count").notNull(),
+    statusCount: integer("status_count").notNull(),
+    capturedBy: text("captured_by").references(() => user.id, { onDelete: "set null" }),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("workspace_snapshot_workspace_captured_idx").on(table.workspace, table.capturedAt)],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   registrationRequests: many(registrationRequest, { relationName: "registration_owner" }),
   auditEntries: many(auditLog),
+  workspaceSnapshots: many(workspaceSnapshot),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -258,4 +278,8 @@ export const auditLogRelations = relations(auditLog, ({ one }) => ({
 export const plotVersionRelations = relations(plotVersion, ({ one }) => ({
   auditEntry: one(auditLog, { fields: [plotVersion.auditLogId], references: [auditLog.id] }),
   creator: one(user, { fields: [plotVersion.createdBy], references: [user.id] }),
+}));
+
+export const workspaceSnapshotRelations = relations(workspaceSnapshot, ({ one }) => ({
+  creator: one(user, { fields: [workspaceSnapshot.capturedBy], references: [user.id] }),
 }));

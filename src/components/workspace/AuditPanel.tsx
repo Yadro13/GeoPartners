@@ -60,7 +60,7 @@ function AuditRow({ entry, canRestore, loading, onCompare }: { entry: AuditEntry
 }
 
 function actionIcon(action: AuditAction) { if (action === "plot.created") return <Plus size={18} />; if (action === "plot.updated") return <Pencil size={17} />; if (action === "plot.deleted") return <Trash2 size={17} />; if (action === "plot.restored") return <RotateCcw size={17} />; if (action === "plot-statuses.updated") return <Settings2 size={17} />; return <FileInput size={18} />; }
-function actionLabelKey(action: AuditAction) { return ({ "plot.created": "created", "plot.updated": "updated", "plot.deleted": "deleted", "plot.restored": "restoredAction", "import.completed": "imported", "plot-statuses.updated": "statuses" } as const)[action]; }
+function actionLabelKey(action: AuditAction) { return ({ "plot.created": "created", "plot.updated": "updated", "plot.deleted": "deleted", "plot.restored": "restoredAction", "import.completed": "imported", "plot-statuses.updated": "statuses", "workspace.snapshot.created": "snapshot" } as const)[action]; }
 
 function demoComparison(entry: AuditEntry): VersionComparison {
   const source = demoPlots.features[0];

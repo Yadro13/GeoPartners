@@ -433,7 +433,8 @@
     "deleted": "Fläche gelöscht",
     "restoredAction": "Version wiederhergestellt",
     "imported": "Paket importiert",
-    "statuses": "Phasenverzeichnis"
+    "statuses": "Phasenverzeichnis",
+    "snapshot": "Arbeitsbereich-Snapshot"
   },
   "notificationsUi": {
     "none": "Keine neuen Benachrichtigungen",

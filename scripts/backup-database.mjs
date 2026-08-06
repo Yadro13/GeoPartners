@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { inspectBackup } from "./backup-utils.mjs";
+import { currentBackupTables, inspectBackup } from "./backup-utils.mjs";
 import { structuredError, structuredLog } from "./structured-log.mjs";
 
 const service = "geopartners-backup";
@@ -38,7 +38,7 @@ async function createBackup() {
   structuredLog(service, "info", "backup.started", { retentionDays: 90 });
   try {
     await run("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file", tempFile, process.env.DATABASE_URL]);
-    const inspection = await inspectBackup(tempFile);
+    const inspection = await inspectBackup(tempFile, currentBackupTables);
     structuredLog(service, "info", "backup.archive.verified", {
       bytes: inspection.bytes,
       requiredTableCount: inspection.requiredTables.length,

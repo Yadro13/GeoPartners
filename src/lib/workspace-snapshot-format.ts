@@ -1,0 +1,32 @@
+import { createHash } from "node:crypto";
+import type { PlotFeature } from "../components/workspace/types";
+import type { CategoryDefinition } from "../data/demo";
+import type { PlotStatusDefinition } from "../data/plot-statuses";
+import type { DataWorkspace } from "./data-workspace";
+
+export const workspaceSnapshotFormatVersion = 1 as const;
+export type WorkspaceSnapshotSource = "manual" | "scheduled";
+
+export type WorkspaceSnapshotPayload = {
+  formatVersion: typeof workspaceSnapshotFormatVersion;
+  workspace: DataWorkspace;
+  capturedAt: string;
+  categories: Record<string, CategoryDefinition>;
+  plotStatuses: PlotStatusDefinition[];
+  plots: PlotFeature[];
+};
+
+export function buildWorkspaceSnapshotPayload(input: Omit<WorkspaceSnapshotPayload, "formatVersion" | "capturedAt"> & { capturedAt: Date | string }): WorkspaceSnapshotPayload {
+  return {
+    formatVersion: workspaceSnapshotFormatVersion,
+    workspace: input.workspace,
+    capturedAt: typeof input.capturedAt === "string" ? new Date(input.capturedAt).toISOString() : input.capturedAt.toISOString(),
+    categories: input.categories,
+    plotStatuses: input.plotStatuses,
+    plots: input.plots,
+  };
+}
+
+export function hashWorkspaceSnapshot(payload: WorkspaceSnapshotPayload) {
+  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}

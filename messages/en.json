@@ -433,7 +433,8 @@
     "deleted": "Plot deleted",
     "restoredAction": "Version restored",
     "imported": "Package imported",
-    "statuses": "Stage directory"
+    "statuses": "Stage directory",
+    "snapshot": "Workspace snapshot"
   },
   "notificationsUi": {
     "none": "No new notifications",

@@ -19,6 +19,8 @@ export const coreTables = [
   "plot_version",
 ];
 
+export const currentBackupTables = [...coreTables, "workspace_snapshot"];
+
 export function createS3Client() {
   requireEnvironment([
     "AWS_ENDPOINT_URL",
@@ -71,12 +73,12 @@ export async function downloadBackup(s3, bucket, key, destination) {
   await pipeline(response.Body, createWriteStream(destination));
 }
 
-export async function inspectBackup(file) {
+export async function inspectBackup(file, requiredTables = coreTables) {
   const info = await stat(file);
   if (info.size === 0) throw new Error("Backup archive is empty.");
 
   const { stdout } = await runCommand("pg_restore", ["--list", file], { capture: true });
-  const missingTables = coreTables.filter((table) => {
+  const missingTables = requiredTables.filter((table) => {
     const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return !new RegExp(`\\bTABLE(?: DATA)?\\s+public\\s+${escaped}\\b`).test(stdout);
   });
@@ -87,7 +89,7 @@ export async function inspectBackup(file) {
 
   return {
     bytes: info.size,
-    requiredTables: coreTables,
+    requiredTables,
   };
 }
 

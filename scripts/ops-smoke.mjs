@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { coreTables } from "./backup-utils.mjs";
+import { coreTables, currentBackupTables } from "./backup-utils.mjs";
 import { createEmailSender, emailTransportMode } from "../src/lib/email-delivery.mjs";
 import { hasPermission } from "../src/lib/permissions.ts";
 import { defaultPlotStatuses } from "../src/data/plot-statuses.ts";
@@ -64,6 +64,9 @@ assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "statuses.mana
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.delete"), false);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "plots.delete"), true);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "statuses.manage"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "snapshots.capture"), false);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "snapshots.capture"), true);
+assert(currentBackupTables.includes("workspace_snapshot"), "new backups require workspace_snapshot");
 assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
   "обрана ділянка як варіант",
   "проведено перемовини з власником",

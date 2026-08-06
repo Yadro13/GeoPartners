@@ -4,7 +4,7 @@ import { plotRowToFeature } from "@/lib/plots";
 import type { GeometryValidationIssue, PlotConflict } from "@/lib/geometry";
 import type { DataWorkspace } from "@/lib/data-workspace";
 
-export const auditActions = ["plot.created", "plot.updated", "plot.deleted", "plot.restored", "import.completed", "plot-statuses.updated"] as const;
+export const auditActions = ["plot.created", "plot.updated", "plot.deleted", "plot.restored", "import.completed", "plot-statuses.updated", "workspace.snapshot.created"] as const;
 export type AuditAction = (typeof auditActions)[number];
 
 export type AuditEntry = {
