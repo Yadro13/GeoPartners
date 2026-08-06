@@ -60,16 +60,19 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   }, [plotStatuses, plots, query]);
   const selectedPlot = plots.find(({ properties }) => properties.id === selectedId) ?? null;
 
-  const persistPlot = useCallback(async (next: PlotFeature, exists = false) => {
+  const persistPlot = useCallback(async (next: PlotFeature, exists = false, relatedPlots: PlotFeature[] = []) => {
     if (!canEditPlots) throw new Error(t("readOnlyNote"));
-    let saved = next;
+    let savedPlots = [next, ...relatedPlots];
     if (!preview) {
-      const response = await fetch(exists ? `/api/plots/${encodeURIComponent(next.properties.id)}` : "/api/plots", { method: exists ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+      const batch = exists && relatedPlots.length > 0;
+      const response = await fetch(batch ? "/api/plots/batch" : exists ? `/api/plots/${encodeURIComponent(next.properties.id)}` : "/api/plots", { method: batch || exists ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(batch ? savedPlots : next) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? t("plotSaveFailed"));
-      saved = await response.json() as PlotFeature;
+      const body = await response.json();
+      savedPlots = batch ? body as PlotFeature[] : [body as PlotFeature];
     }
-    setPlots((current) => exists ? current.map((plot) => plot.properties.id === saved.properties.id ? saved : plot) : [...current, saved]);
-    setSelectedId(saved.properties.id); setModal(null); setToast(exists ? t("changesSaved") : t("plotAdded"));
+    const savedById = new Map(savedPlots.map((plot) => [plot.properties.id, plot]));
+    setPlots((current) => exists ? current.map((plot) => savedById.get(plot.properties.id) ?? plot) : [...current, savedPlots[0]]);
+    setSelectedId(next.properties.id); setModal(null); setToast(exists ? t("changesSaved") : t("plotAdded"));
   }, [canEditPlots, preview, t]);
 
   const removePlot = useCallback(async (target: PlotFeature) => {
@@ -251,8 +254,8 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, plotStatuses, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, managedUsers: initialUsers, actions };
 
   return <><LocalePreferenceSync preferredLocale={currentUser.locale} />{isMobile ? <MobileWorkspace {...sharedProps} /> : <DesktopWorkspace {...sharedProps} />}
-    {modal?.type === "add" ? <WorkspaceModal title={t("newPlot")} description={t("newPlotDescription")} onClose={() => setModal(null)} wide><PlotForm plot={null} neighbors={plots} categories={categories} baseMap={baseMap} onSave={(plot) => persistPlot(plot)} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
-    {modal?.type === "edit" ? <WorkspaceModal title={t("editPlotTitle")} onClose={() => setModal(null)} wide><PlotForm plot={modal.plot} neighbors={plots.filter(({ properties }) => properties.id !== modal.plot.properties.id)} categories={categories} baseMap={baseMap} onSave={(plot) => persistPlot(plot, true)} onDelete={canDeletePlots ? () => void removePlot(modal.plot) : undefined} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
+    {modal?.type === "add" ? <WorkspaceModal title={t("newPlot")} description={t("newPlotDescription")} onClose={() => setModal(null)} wide><PlotForm plot={null} neighbors={plots} categories={categories} baseMap={baseMap} onSave={(plot, related) => persistPlot(plot, false, related)} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
+    {modal?.type === "edit" ? <WorkspaceModal title={t("editPlotTitle")} onClose={() => setModal(null)} wide><PlotForm plot={modal.plot} neighbors={plots.filter(({ properties }) => properties.id !== modal.plot.properties.id)} categories={categories} baseMap={baseMap} onSave={(plot, related) => persistPlot(plot, true, related)} onDelete={canDeletePlots ? () => void removePlot(modal.plot) : undefined} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "stages" ? <WorkspaceModal title={t("plotStagesTitle")} description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)} wide><PlotStagesForm plot={modal.plot} statuses={plotStatuses} editable={canEditPlots} onSave={canEditPlots ? (plot) => persistPlot(plot, true) : undefined} onClose={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "import" ? <WorkspaceModal title={t("importTitle")} description={t("importDescription")} onClose={() => setModal(null)} wide><ImportForm onImport={importFiles} onCancel={() => setModal(null)} existingPlots={plots} categories={categories} baseMap={baseMap} /></WorkspaceModal> : null}
     {modal?.type === "documents" ? <WorkspaceModal title={t("plotDocuments")} description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)}><div className="document-list"><button type="button" onClick={() => downloadText(JSON.stringify(modal.plot, null, 2), `${modal.plot.properties.cadastralNumber.replaceAll(":", "")}.geojson`, "application/geo+json")}><FileText size={20} /><span><strong>{t("plotGeometry")}</strong><small>GeoJSON</small></span><Download size={18} /></button>{modal.plot.properties.documentUrl ? <a href={modal.plot.properties.documentUrl} target="_blank" rel="noreferrer"><FileText size={20} /><span><strong>{modal.plot.properties.documentName ?? t("documents")}</strong><small>PDF</small></span><Download size={18} /></a> : <p>{t("documentMissing")}</p>}</div></WorkspaceModal> : null}

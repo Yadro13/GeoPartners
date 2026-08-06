@@ -1217,14 +1217,21 @@
 }
 
 .report-matrix--wtg {
-  font-size: 9px;
+  font-size: 10px;
 }
 
-.report-matrix--wtg thead th:nth-child(1) { width: 6%; }
-.report-matrix--wtg thead th:nth-child(2) { width: 13%; }
-.report-matrix--wtg thead th:nth-child(3) { width: 12%; }
-.report-matrix--wtg thead th:nth-child(4) { width: 10%; }
-.report-matrix--wtg thead th:nth-child(5) { width: 7%; }
+.report-matrix--wtg .report-matrix__wtg-number-col { width: clamp(64px, 4.5vw, 88px); }
+.report-matrix--wtg .report-matrix__main-col { width: clamp(125px, 9vw, 175px); }
+.report-matrix--wtg .report-matrix__alternatives-col { width: clamp(125px, 9.5vw, 185px); }
+.report-matrix--wtg .report-matrix__final-col { width: clamp(120px, 8.5vw, 170px); }
+.report-matrix--wtg .report-matrix__total-col { width: clamp(90px, 6vw, 118px); }
+
+.report-matrix--wtg thead th:nth-child(-n + 5) {
+  hyphens: auto;
+  line-height: 1.25;
+  overflow-wrap: normal;
+  word-break: normal;
+}
 
 .report-matrix--wtg .report-matrix__cost {
   left: auto;
@@ -1246,7 +1253,7 @@
 .report-matrix__references small,
 .report-matrix__missing {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 400;
 }
 
@@ -1649,7 +1656,7 @@
 }
 
 .workspace-modal[data-wide="true"] {
-  max-width: 760px;
+  max-width: 960px;
 }
 
 .workspace-modal > header {
@@ -1737,6 +1744,91 @@
   grid-template-columns: 1fr 40px;
 }
 
+.result-link-matches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  grid-column: 1 / -1;
+}
+
+.result-link-matches span {
+  background: #e7f1ea;
+  color: var(--green-dark);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 500;
+  gap: 5px;
+  padding: 4px 6px;
+}
+
+.result-link-matches strong {
+  font-weight: 800;
+}
+
+.result-link-matches--empty {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.result-group-editor {
+  border: 1px solid #bfd5c6;
+  grid-column: 1 / -1;
+}
+
+.result-group-editor summary {
+  color: var(--green-dark);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.result-group-editor[open] summary {
+  border-bottom: 1px solid #dbe8df;
+}
+
+.result-group-editor > div {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1.2fr);
+  padding: 9px;
+}
+
+.result-group-editor fieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.result-group-editor legend {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.result-group-editor__alternatives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  max-height: 82px;
+  overflow-y: auto;
+}
+
+.result-group-editor__alternatives label {
+  align-items: center;
+  color: var(--ink);
+  flex-direction: row;
+  font-size: 10px;
+  min-height: 26px;
+}
+
+.result-group-editor__alternatives input {
+  min-height: 0;
+}
+
 .result-link-row__add {
   align-items: center;
   background: transparent;
@@ -1812,6 +1904,50 @@
   min-height: 150px;
   padding: 20px;
   width: 100%;
+}
+
+@media (min-width: 900px) {
+  .workspace-modal[data-wide="true"]:has(.plot-form) > header {
+    padding: 14px 18px 11px;
+  }
+
+  .workspace-modal[data-wide="true"] .workspace-modal__body:has(.plot-form) {
+    padding: 8px 18px 10px;
+  }
+
+  .plot-form .form-grid {
+    gap: 9px 12px;
+  }
+
+  .plot-form .result-links-editor {
+    padding: 9px 0;
+  }
+
+  .plot-form .result-links-editor > p {
+    margin-bottom: 5px;
+  }
+
+  .plot-form .result-link-row {
+    grid-template-columns: minmax(125px, 0.45fr) minmax(260px, 1.55fr);
+    padding: 3px 0;
+  }
+
+  .plot-form .geometry-editor__map {
+    height: clamp(160px, 20dvh, 190px);
+  }
+
+  .plot-form .geometry-editor__toolbar {
+    min-height: 42px;
+  }
+
+  .plot-form .geometry-editor__toolbar button {
+    height: 32px;
+  }
+
+  .plot-form .form-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
 }
 
 .import-source-actions {
