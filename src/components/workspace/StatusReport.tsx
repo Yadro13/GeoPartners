@@ -18,8 +18,6 @@ export type ReportView = PlotResultType | "plots";
 const reportViews: ReportView[] = ["wtg", "road", "servitude", "substation", "plots"];
 const viewLabelKeys = { wtg: "viewWtg", road: "viewRoad", servitude: "viewServitude", substation: "viewSubstation", plots: "viewPlots" } as const;
 const titleKeys = { wtg: "wtgTitle", road: "roadTitle", servitude: "servitudeTitle", substation: "substationTitle" } as const;
-const descriptionKeys = { wtg: "wtgDescription", road: "roadDescription", servitude: "servitudeDescription", substation: "substationDescription" } as const;
-const restrictedDescriptionKeys = { wtg: "wtgDescriptionRestricted", road: "roadDescriptionRestricted", servitude: "servitudeDescriptionRestricted", substation: "substationDescriptionRestricted" } as const;
 const countKeys = { wtg: "wtgResultCount", road: "roadResultCount", servitude: "servitudeResultCount", substation: "substationResultCount" } as const;
 const numberKeys = { wtg: "wtgNumber", road: "roadNumber", servitude: "servitudeNumber", substation: "substationNumber" } as const;
 const finalPlotKeys = { wtg: "finalWtgPlot", road: "finalRoadPlot", servitude: "finalServitudePlot", substation: "finalSubstationPlot" } as const;
@@ -74,7 +72,7 @@ export function StatusReport({ plots, categories, statuses, view, canViewExpense
   const totalCost = (resultType ? resultGroups : rows).reduce((sum, row) => sum + row.totalCost, 0);
 
   return <section className="status-report" aria-labelledby="status-report-title">
-    <div className="status-report__heading"><div><span className="eyebrow">{t("progressEyebrow")}</span><h2 id="status-report-title">{resultType ? t(titleKeys[resultType]) : t("progressTitle")}</h2><p>{resultType ? t(canViewExpenses ? descriptionKeys[resultType] : restrictedDescriptionKeys[resultType]) : t(canViewExpenses ? "progressDescription" : "progressDescriptionRestricted")}</p></div><button className="command-button command-button--primary" disabled={exporting || !itemCount} type="button" onClick={runExport}><Download size={17} />{exporting ? t("exporting") : t("downloadExcel")}</button></div>
+    <div className="status-report__heading"><div><span className="eyebrow">{t("progressEyebrow")}</span><h2 id="status-report-title">{resultType ? t(titleKeys[resultType]) : t("progressTitle")}</h2></div><button className="command-button command-button--primary" disabled={exporting || !itemCount} type="button" onClick={runExport}><Download size={17} />{exporting ? t("exporting") : t("downloadExcel")}</button></div>
     <div className="status-report__filters">
       <label className="status-report__search"><span>{t("searchPlots")}</span><div><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></div></label>
       <label><span>{t("category")}</span><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="all">{t("allCategories")}</option>{Object.entries(categories).filter(([, category]) => category.visible !== false).map(([id, category]) => <option key={id} value={id}>{category.name}</option>)}</select></label>
