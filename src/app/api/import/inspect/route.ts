@@ -4,6 +4,7 @@ import { readPdfBuffer, validateUploadFiles } from "@/lib/import-upload";
 import { parseLandDocument } from "@/lib/pdf-metadata";
 import { hasPermission } from "@/lib/permissions";
 import { errorFields, serverLog } from "@/lib/server-log";
+import { importPathStem, uploadedImportFiles } from "@/lib/import-file-path";
 
 export const runtime = "nodejs";
 
@@ -15,10 +16,13 @@ export async function POST(request: Request) {
     if (!hasPermission(currentUser, "imports.run")) return NextResponse.json({ error: "Імпорт доступний лише адміністратору." }, { status: 403 });
   }
   try {
-    const form = await request.formData(); const files = form.getAll("files").filter((value): value is File => value instanceof File);
+    const form = await request.formData(); const files = uploadedImportFiles(form);
     validateUploadFiles(files, "pdf");
     serverLog("info", "import.inspect.started", { fileCount: files.length });
-    const documents = await Promise.all(files.map(async (file) => ({ name: file.name, stem: file.name.replace(/\.pdf$/i, "").toLocaleLowerCase(), metadata: await parseLandDocument(await readPdfBuffer(file)) })));
+    const documents = await Promise.all(files.map(async (file) => {
+      const metadata = await parseLandDocument(await readPdfBuffer(file));
+      return { name: file.name, stem: importPathStem(file.name), cadastralNumber: metadata.cadastralNumber, metadata };
+    }));
     serverLog("info", "import.inspect.completed", { fileCount: files.length, durationMs: Date.now() - startedAt });
     return NextResponse.json({ documents });
   } catch (error) {

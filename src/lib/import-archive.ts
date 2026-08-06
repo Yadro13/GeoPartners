@@ -1,5 +1,6 @@
 import { unzip, type UnzipFileInfo } from "fflate";
 import { IMPORT_UPLOAD_LIMITS } from "@/lib/import-limits";
+import { importFilePath, importPathKey, normalizeImportPath } from "@/lib/import-file-path";
 
 export type ImportSelection = {
   files: File[];
@@ -29,7 +30,7 @@ export async function expandImportSelection(selected: File[]): Promise<ImportSel
     if (archive.size > IMPORT_UPLOAD_LIMITS.selectionBytes) throw new Error(`${archive.name}: розмір архіву перевищує 500 МБ.`);
     const extracted = await extractArchive(archive, totalBytes, skippedEntries);
     for (const file of extracted) {
-      const key = file.name.toLocaleLowerCase();
+      const key = importPathKey(file.name);
       if (names.has(key)) throw new Error(`${archive.name}: файл ${file.name} дублюється у вибраному пакеті.`);
       names.add(key);
       files.push(file);
@@ -49,7 +50,7 @@ function validateLooseFiles(files: File[], names: Set<string>) {
     if (!supportedEntry.test(file.name)) throw new Error(`${file.name}: непідтримуваний формат.`);
     if (!file.size) throw new Error(`${file.name}: файл порожній.`);
     if (file.size > IMPORT_UPLOAD_LIMITS.fileBytes) throw new Error(`${file.name}: розмір перевищує 20 МБ.`);
-    const key = file.name.toLocaleLowerCase();
+    const key = importPathKey(file.name);
     if (names.has(key)) throw new Error(`${file.name}: назва файлу дублюється у вибраному пакеті.`);
     names.add(key);
     totalBytes += file.size;
@@ -68,6 +69,7 @@ async function extractArchive(archive: File, currentBytes: number, skippedEntrie
   const entries = await unzipArchive(data, (entry) => {
     scannedEntries += 1;
     if (scannedEntries > IMPORT_UPLOAD_LIMITS.archiveEntries) throw new Error(`${archive.name}: архів містить понад ${IMPORT_UPLOAD_LIMITS.archiveEntries} записів.`);
+    if (/[\\/]$/.test(entry.name)) return false;
     const path = normalizeArchivePath(entry.name, archive.name);
     if (!path || path.endsWith("/") || ignoredEntry.test(path)) return false;
     if (!supportedEntry.test(path)) {
@@ -110,11 +112,11 @@ function unzipArchive(data: Uint8Array, filter: (entry: UnzipFileInfo) => boolea
 }
 
 function normalizeArchivePath(path: string, archiveName: string) {
-  const normalized = path.replaceAll("\\", "/").replace(/^\.\/+/, "");
-  if (normalized.includes("\0") || normalized.startsWith("/") || /^[a-z]:\//i.test(normalized) || normalized.split("/").includes("..")) {
+  try {
+    return normalizeImportPath(path);
+  } catch {
     throw new Error(`${archiveName}: небезпечний шлях усередині архіву.`);
   }
-  return normalized.split("/").filter((part) => part && part !== ".").join("/");
 }
 
 function isZipSignature(data: Uint8Array) {
@@ -122,13 +124,12 @@ function isZipSignature(data: Uint8Array) {
 }
 
 function normalizeSelectedFile(file: File) {
-  const relativePath = selectedPath(file);
-  const normalizedPath = relativePath ? normalizeArchivePath(relativePath, file.name) : file.name;
+  const normalizedPath = importFilePath(file);
   return normalizedPath === file.name ? file : new File([file], normalizedPath, { type: file.type, lastModified: file.lastModified });
 }
 
 function selectedPath(file: File) {
-  return "webkitRelativePath" in file && typeof file.webkitRelativePath === "string" && file.webkitRelativePath ? file.webkitRelativePath : file.name;
+  return importFilePath(file);
 }
 
 function archiveStem(name: string) {

@@ -450,6 +450,7 @@
     "issueInvalidCad": "Eine vollständige Katasternummer konnte nicht ermittelt werden.",
     "issueGeoRead": "GeoJSON konnte nicht gelesen werden: {name}.",
     "issuePdfUnmatched": "Für {name} wurde kein passendes GeoJSON gefunden.",
+    "issuePdfAmbiguous": "Im Ordner von {name} wurden mehrere PDFs mit derselben Katasternummer gefunden; die Fläche wird ohne Dokument importiert.",
     "issueNoPlots": "Das Paket enthält keine gültigen Flächen.",
     "issueDuplicateCad": "Diese Katasternummer kommt im Paket mehrfach vor.",
     "issueRing": "Die Kontur hat einen ungültigen oder nicht geschlossenen Ring.",

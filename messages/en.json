@@ -450,6 +450,7 @@
     "issueInvalidCad": "A complete cadastral number could not be determined.",
     "issueGeoRead": "Could not read GeoJSON: {name}.",
     "issuePdfUnmatched": "No matching GeoJSON was found for {name}.",
+    "issuePdfAmbiguous": "Multiple PDFs with the same cadastral number were found in the folder containing {name}; the plot will be imported without a document.",
     "issueNoPlots": "The package contains no valid plots.",
     "issueDuplicateCad": "This cadastral number is repeated in the package.",
     "issueRing": "The outline has an invalid or unclosed ring.",

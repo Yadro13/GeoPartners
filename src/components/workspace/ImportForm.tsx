@@ -118,7 +118,7 @@ function formatConflictValue(field: ImportConflictField, value: string | number,
   return String(value);
 }
 
-type ImportKey = "bytes" | "kilobytes" | "geometryErrors" | "geometryWarnings" | "geometryValid" | "closeRings" | "removeDuplicates" | "squareMeters" | "betweenFiles" | "withDatabase" | "pair" | "pairs" | "issueObjectSkipped" | "issueCadMismatch" | "issuePdfMissing" | "issueInvalidCad" | "issueGeoRead" | "issuePdfUnmatched" | "issueNoPlots" | "issueDuplicateCad" | "issueRing" | "issueCoordinates" | "issueDuplicateVertices" | "issueSelfIntersection" | "issueOgc" | "issueShortSegment" | "issueOverlap" | "microOverlap" | "overlap" | "sourcePackage" | "sourceDatabase" | "issueUnknown" | "batchProgress";
+type ImportKey = "bytes" | "kilobytes" | "geometryErrors" | "geometryWarnings" | "geometryValid" | "closeRings" | "removeDuplicates" | "squareMeters" | "betweenFiles" | "withDatabase" | "pair" | "pairs" | "issueObjectSkipped" | "issueCadMismatch" | "issuePdfMissing" | "issueInvalidCad" | "issueGeoRead" | "issuePdfUnmatched" | "issuePdfAmbiguous" | "issueNoPlots" | "issueDuplicateCad" | "issueRing" | "issueCoordinates" | "issueDuplicateVertices" | "issueSelfIntersection" | "issueOgc" | "issueShortSegment" | "issueOverlap" | "microOverlap" | "overlap" | "sourcePackage" | "sourceDatabase" | "issueUnknown" | "batchProgress";
 type ImportTranslator = (key: ImportKey, values?: Record<string, string | number>) => string;
 type NumberFormatter = (value: number, options?: { minimumFractionDigits?: number; maximumFractionDigits?: number }) => string;
 
@@ -145,7 +145,7 @@ function localizeImportIssue(issue: ImportIssue, locale: string, t: ImportTransl
   if (locale === "uk" || !issue.code) return issue.message;
   const values = issue.values ?? {};
   const simpleKeys: Record<string, ImportKey> = {
-    "object-skipped": "issueObjectSkipped", "cad-mismatch": "issueCadMismatch", "invalid-cad": "issueInvalidCad", "geo-read": "issueGeoRead", "pdf-unmatched": "issuePdfUnmatched", "no-plots": "issueNoPlots", "duplicate-cad": "issueDuplicateCad", "geometry-ring": "issueRing", "geometry-coordinates": "issueCoordinates", "geometry-duplicate": "issueDuplicateVertices", "geometry-self-intersection": "issueSelfIntersection", "geometry-ogc": "issueOgc", "geometry-short-segment": "issueShortSegment",
+    "object-skipped": "issueObjectSkipped", "cad-mismatch": "issueCadMismatch", "invalid-cad": "issueInvalidCad", "geo-read": "issueGeoRead", "pdf-unmatched": "issuePdfUnmatched", "pdf-ambiguous": "issuePdfAmbiguous", "no-plots": "issueNoPlots", "duplicate-cad": "issueDuplicateCad", "geometry-ring": "issueRing", "geometry-coordinates": "issueCoordinates", "geometry-duplicate": "issueDuplicateVertices", "geometry-self-intersection": "issueSelfIntersection", "geometry-ogc": "issueOgc", "geometry-short-segment": "issueShortSegment",
   };
   if (issue.code === "overlap") {
     const area = typeof values.area === "number" ? formatSquareMeters(values.area, t, formatNumber) : "";

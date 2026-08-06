@@ -282,6 +282,16 @@ const additionalResultViews = {
   await page.getByRole("dialog").waitFor({ state: "detached" });
   assert(await page.getByRole("button", { name: "Імпортувати дані" }).evaluate((button) => button === document.activeElement), "modal returns focus to its trigger");
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
+  const recursiveDirectory = recursiveFolderUpload();
+  await page.locator('input[type="file"][webkitdirectory]').setInputFiles(recursiveDirectory);
+  await page.getByText("2 GeoJSON", { exact: true }).waitFor();
+  await page.getByText(/sector-a\/plot\.geojson$/).waitFor();
+  await page.getByText(/sector-b\/plot\.geojson$/).waitFor();
+  await page.getByRole("button", { name: "Перевірити пакет (2)", exact: true }).click();
+  await page.getByText("0 помилок").waitFor();
+  assert((await page.locator(".import-review__item").count()) === 2, "recursive folder selection keeps same-named GeoJSON files from nested directories separate");
+  fs.rmSync(recursiveDirectory, { recursive: true, force: true });
+  await page.getByRole("button", { name: "Змінити файли" }).click();
   await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "damaged.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
   await page.getByText("damaged.zip: вміст файлу не відповідає формату ZIP.").waitFor();
   await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(zipUpload());
@@ -943,6 +953,24 @@ function zipUpload() {
       "docs/README.txt": new TextEncoder().encode("service note"),
     })),
   };
+}
+
+function recursiveFolderUpload() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "geopartners-recursive-"));
+  const first = path.join(root, "sector-a");
+  const second = path.join(root, "level-1", "sector-b");
+  fs.mkdirSync(first, { recursive: true });
+  fs.mkdirSync(second, { recursive: true });
+  fs.writeFileSync(path.join(first, "plot.geojson"), JSON.stringify(folderPlot("recursive-a", "1111111111:11:111:1201", 26.66)));
+  fs.writeFileSync(path.join(second, "plot.geojson"), JSON.stringify(folderPlot("recursive-b", "1111111111:11:111:1202", 26.67)));
+  fs.writeFileSync(path.join(second, "notes.txt"), "ignored");
+  return root;
+}
+
+function folderPlot(id, cadastralNumber, longitude) {
+  return { type: "Feature", properties: { id, cadastralNumber }, geometry: { type: "Polygon", coordinates: [[
+    [longitude, 49.45], [longitude + 0.001, 49.45], [longitude + 0.001, 49.451], [longitude, 49.451], [longitude, 49.45],
+  ]] } };
 }
 
 function minimalPdf(text) {

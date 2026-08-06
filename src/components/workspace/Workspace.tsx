@@ -7,6 +7,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { demoPlots, type CategoryDefinition } from "@/data/demo";
 import { defaultPlotStatuses, type PlotStatusDefinition } from "@/data/plot-statuses";
 import { categoriesWithDefaults, downloadText, normalizeImport, plotsToCsv, toFeatureCollection, type ImportResult } from "@/lib/plot-data";
+import { appendImportFile } from "@/lib/import-file-path";
 import { validatePolygonGeometry } from "@/lib/geometry";
 import { hasPermission } from "@/lib/permissions";
 import type { DataWorkspace } from "@/lib/data-workspace";
@@ -168,7 +169,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     if (!preview) {
       let importedCount = 0; let warningCount = 0; let firstSaved: PlotFeature | undefined;
       for (let index = 0; index < batches.length; index += 1) {
-        const form = new FormData(); batches[index].forEach((file) => form.append("files", file));
+        const form = new FormData(); batches[index].forEach((file) => appendImportFile(form, file));
         const response = await fetch("/api/import", { method: "POST", body: form }); const body = await response.json().catch(() => null);
         if (!response.ok) throw new Error(t("batchImportFailed", { batch: index + 1, total: batches.length, completed: importedCount, reason: body?.error ?? t("packageImportFailed") }));
         const saved = body.plots as PlotFeature[]; const returnedCategories = body.categories as Record<string, CategoryDefinition>;
