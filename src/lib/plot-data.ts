@@ -5,6 +5,7 @@ import { calculatePolygonAreaHa } from "@/lib/geometry";
 import { parsePlotStatusProgress, totalPlotStatusCost } from "@/lib/plot-status-progress";
 import { parsePlotResultLinks } from "@/lib/plot-result-links";
 import { nullableNumber, parseRoadOwnershipType, parseServitudePaymentPeriod, sourcePlotIdentifier } from "@/lib/plot-special-fields";
+import { parseImportDecisions } from "@/lib/import-merge";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -82,6 +83,7 @@ function normalizeFeature(raw: unknown, filename: string): PlotFeature[] {
         status: textValue(properties.status),
         statusProgress: parsePlotStatusProgress(properties.statusProgress ?? properties.status_progress),
         sourceFilename: textValue(properties.sourceFilename) || sourceStem,
+        importDecisions: parseImportDecisions(properties.importDecisions),
       },
     };
   });

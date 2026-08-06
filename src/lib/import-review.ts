@@ -5,6 +5,7 @@ import { packImportFileGroups, packImportFiles } from "@/lib/import-batches";
 import { categoriesWithDefaults, normalizeImport } from "@/lib/plot-data";
 import { calculatePolygonAreaHa, findPlotConflicts, repairPolygonGeometry, validatePolygonGeometry, type GeometryRepairAction, type GeometryValidationIssue, type GeometryValidationMarker, type PlotConflict } from "@/lib/geometry";
 import { plotIdentityKey } from "@/lib/plot-special-fields";
+import { mergeExistingPlotForImport, type ImportDocumentConflict, type ImportFieldConflict, type ImportConflictField, type ImportResolution } from "@/lib/import-merge";
 
 export type ImportIssue = { level: "warning" | "error"; message: string; code?: string; values?: Record<string, string | number>; dedupeKey?: string };
 export type ImportCandidate = {
@@ -18,6 +19,9 @@ export type ImportCandidate = {
   sourceIssues: ImportIssue[];
   issues: ImportIssue[];
   conflicts: PlotConflict[];
+  dataConflicts: ImportFieldConflict[];
+  documentConflict: ImportDocumentConflict | null;
+  includePdf: boolean;
   geometryIssues: GeometryValidationIssue[];
   validationMarkers: GeometryValidationMarker[];
   repairActions: GeometryRepairAction[];
@@ -51,7 +55,7 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
         const document = byCad ?? byStem ?? null;
         if (document && geoDigits.length === 19 && document.metadata.cadastralNumber && digits(document.metadata.cadastralNumber) !== geoDigits) issues.push({ level: "error", message: `Кадастровий номер не збігається з ${document.name}.`, code: "cad-mismatch", values: { name: document.name } });
         const metadata = document?.metadata;
-        const plot: PlotFeature = { ...original, properties: { ...original.properties,
+        let plot: PlotFeature = { ...original, properties: { ...original.properties,
           cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber,
           areaHa: metadata?.areaHa || original.properties.areaHa,
           owner: metadata?.owner || original.properties.owner,
@@ -61,25 +65,12 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
           hasDocument: Boolean(document),
         } };
         const existing = existingPlots.find(({ properties }) => plotIdentityKey(properties.cadastralNumber) === plotIdentityKey(plot.properties.cadastralNumber));
+        let dataConflicts: ImportFieldConflict[] = []; let documentConflict: ImportDocumentConflict | null = null; let includePdf = Boolean(document);
         if (existing) {
-          plot.properties.id = existing.properties.id;
-          if (!(plot.properties.resultLinks?.length)) plot.properties.resultLinks = existing.properties.resultLinks ?? [];
-          if (!document) Object.assign(plot.properties, {
-            owner: plot.properties.owner || existing.properties.owner,
-            lessee: plot.properties.lessee || existing.properties.lessee,
-            documentActualAt: plot.properties.documentActualAt || existing.properties.documentActualAt,
-          });
-          Object.assign(plot.properties, {
-            roadOwnershipType: plot.properties.roadOwnershipType || existing.properties.roadOwnershipType,
-            servitudeValidFrom: plot.properties.servitudeValidFrom || existing.properties.servitudeValidFrom,
-            servitudeValidUntil: plot.properties.servitudeValidUntil || existing.properties.servitudeValidUntil,
-            servitudePaymentAmount: plot.properties.servitudePaymentAmount ?? existing.properties.servitudePaymentAmount,
-            servitudePaymentPeriod: plot.properties.servitudePaymentPeriod || existing.properties.servitudePaymentPeriod,
-            substationType: plot.properties.substationType || existing.properties.substationType,
-            substationCapacityMw: plot.properties.substationCapacityMw ?? existing.properties.substationCapacityMw,
-          });
+          const merged = mergeExistingPlotForImport(plot, existing, { incomingDocumentName: document?.name });
+          plot = merged.plot; dataConflicts = merged.fieldConflicts; documentConflict = merged.documentConflict; includePdf = merged.includeDocument;
         }
-        candidates.push({ key: `${file.name}-${plot.properties.id}`, included: true, geoName: file.name, pdfName: document?.name ?? null, plot, action: existing ? "update" : "create", coordinateCount: plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), sourceIssues: issues, issues: [], conflicts: [], geometryIssues: [], validationMarkers: [], repairActions: [], appliedRepairs: [] });
+        candidates.push({ key: `${file.name}-${plot.properties.id}`, included: true, geoName: file.name, pdfName: document?.name ?? null, plot, action: existing ? "update" : "create", coordinateCount: plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0), sourceIssues: issues, issues: [], conflicts: [], dataConflicts, documentConflict, includePdf, geometryIssues: [], validationMarkers: [], repairActions: [], appliedRepairs: [] });
       }
     } catch (error) { packageIssues.push({ level: "error", message: `${file.name}: ${error instanceof Error ? error.message : "не вдалося прочитати GeoJSON"}`, code: "geo-read", values: { name: file.name } }); }
   }
@@ -118,6 +109,29 @@ export function setAllImportCandidatesIncluded(review: ImportReview, included: b
   return finalizeReview(candidates, review.categories, review.packageIssues, existingPlots);
 }
 
+export function setImportFieldResolution(review: ImportReview, key: string, field: ImportConflictField, resolution: ImportResolution) {
+  return { ...review, candidates: review.candidates.map((candidate) => {
+    if (candidate.key !== key) return candidate;
+    const conflict = candidate.dataConflicts.find((item) => item.field === field);
+    if (!conflict) return candidate;
+    const fields = { ...candidate.plot.properties.importDecisions?.fields, [field]: resolution };
+    return {
+      ...candidate,
+      dataConflicts: candidate.dataConflicts.map((item) => item.field === field ? { ...item, resolution } : item),
+      plot: { ...candidate.plot, properties: { ...candidate.plot.properties, [field]: resolution === "imported" ? conflict.importedValue : conflict.currentValue, importDecisions: { ...candidate.plot.properties.importDecisions, fields } } },
+    };
+  }) };
+}
+
+export function setImportDocumentResolution(review: ImportReview, key: string, resolution: ImportResolution) {
+  return { ...review, candidates: review.candidates.map((candidate) => candidate.key !== key || !candidate.documentConflict ? candidate : {
+    ...candidate,
+    includePdf: resolution === "imported",
+    documentConflict: { ...candidate.documentConflict, resolution },
+    plot: { ...candidate.plot, properties: { ...candidate.plot.properties, importDecisions: { ...candidate.plot.properties.importDecisions, document: resolution } } },
+  }) };
+}
+
 export function buildReviewedImportBatches(review: ImportReview, files: File[]) {
   const included = review.candidates.filter(({ included }) => included);
   const byName = new Map(files.map((file) => [file.name, file]));
@@ -131,7 +145,7 @@ export function buildReviewedImportBatches(review: ImportReview, files: File[]) 
     const geoName = sourceCounts.get(candidate.geoName)!.length > 1 ? indexedGeoName(candidate.geoName, index) : candidate.geoName;
     const content = JSON.stringify({ type: "FeatureCollection", categories: review.categories, features: [candidate.plot] });
     const geo = new File([content], geoName, { type: "application/geo+json", lastModified: source.lastModified });
-    const pdf = candidate.pdfName ? byName.get(candidate.pdfName) : undefined;
+    const pdf = candidate.pdfName && candidate.includePdf ? byName.get(candidate.pdfName) : undefined;
     return pdf ? [geo, pdf] : [geo];
   });
   return packImportFileGroups(groups);

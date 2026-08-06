@@ -340,6 +340,15 @@ const additionalResultViews = {
   await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).click();
   await page.getByText(/Імпорт завершено:/).waitFor();
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "repeat-conflict.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repeatImportConflictPackage())) });
+  await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
+  await page.getByText("Порівняння даних повторного імпорту", { exact: true }).waitFor();
+  const ownerConflict = page.locator(".import-data-conflicts__row").filter({ hasText: "Власник" });
+  assert(await ownerConflict.getByRole("button", { name: /Залишити поточне/ }).getAttribute("data-active") === "true", "repeat import keeps the current conflicting owner by default");
+  await ownerConflict.getByRole("button", { name: /Взяти з імпорту/ }).click();
+  assert(await ownerConflict.getByRole("button", { name: /Взяти з імпорту/ }).getAttribute("data-active") === "true", "admin can explicitly accept an imported conflicting owner");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-import-data-conflicts.png") });
+  await page.getByRole("button", { name: "Змінити файли" }).click();
   await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(geoJsonUpload("1111111111:11:111:1111.geojson"));
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
   await page.getByText(/(?:Мікронакладання|Накладання).*6820982100:04:051:0018/).waitFor();
@@ -495,6 +504,17 @@ const additionalResultViews = {
   assert(mobileSelectionReview.width === mobileSelectionReview.clientWidth && mobileSelectionReview.clientWidth <= mobileSelectionReview.viewport, "mobile candidate selection has no horizontal overflow");
   assert(!(await page.getByRole("button", { name: "Підтвердити імпорт (1)", exact: true }).isDisabled()), "mobile candidate selection unblocks the valid subset");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-import-selection-review.png") });
+  await page.getByRole("button", { name: "Змінити файли" }).click();
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "repeat-conflict.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repeatImportConflictPackage())) });
+  await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
+  await page.getByText("Порівняння даних повторного імпорту", { exact: true }).waitFor();
+  const mobileDataConflict = page.locator(".import-data-conflicts__row").filter({ hasText: "Власник" });
+  const mobileConflictButtons = await mobileDataConflict.getByRole("button").all();
+  const currentConflictBox = await mobileConflictButtons[0].boundingBox(); const importedConflictBox = await mobileConflictButtons[1].boundingBox();
+  assert(currentConflictBox && importedConflictBox && importedConflictBox.y > currentConflictBox.y, "mobile data-conflict choices stack vertically");
+  const mobileDataConflictReview = await page.getByRole("dialog").evaluate((element) => ({ width: element.scrollWidth, clientWidth: element.clientWidth, viewport: innerWidth }));
+  assert(mobileDataConflictReview.width === mobileDataConflictReview.clientWidth && mobileDataConflictReview.clientWidth <= mobileDataConflictReview.viewport, "mobile data-conflict review has no horizontal overflow");
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-mobile-import-data-conflicts.png") });
   await page.getByRole("button", { name: "Змінити файли" }).click();
   await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles({ name: "repairable.geojson", mimeType: "application/geo+json", buffer: Buffer.from(JSON.stringify(repairableGeometryPackage())) });
   await page.getByRole("button", { name: "Перевірити пакет (1)", exact: true }).click();
@@ -870,6 +890,12 @@ function selectiveGeometryPackage() {
     { type: "Feature", properties: { id: "selective-invalid", cadastralNumber: "1111111111:11:111:1101" }, geometry: { type: "Polygon", coordinates: [[[26.64, 49.45], [26.641, 49.451], [26.64, 49.451], [26.641, 49.45], [26.64, 49.45]]] } },
     { type: "Feature", properties: { id: "selective-update", cadastralNumber: "6820982100:04:051:0018" }, geometry: { type: "Polygon", coordinates: [[[26.65297, 49.44633], [26.65294, 49.44369], [26.6529, 49.44171], [26.65147, 49.44226], [26.65157, 49.44588], [26.65297, 49.44633]]] } },
   ] };
+}
+
+function repeatImportConflictPackage() {
+  return { type: "Feature", properties: { id: "repeat-conflict", cadastralNumber: "6820982100:04:051:0018", owner: "Imported owner" }, geometry: { type: "Polygon", coordinates: [[
+    [26.65297, 49.44633], [26.65294, 49.44369], [26.6529, 49.44171], [26.65147, 49.44226], [26.65157, 49.44588], [26.65297, 49.44633],
+  ]] } };
 }
 
 function geoJsonUpload(name) {

@@ -16,6 +16,7 @@ import { getDataWorkspace } from "@/lib/data-workspace";
 import { readPdfBuffer, validateUploadFiles } from "@/lib/import-upload";
 import { errorFields, serverLog } from "@/lib/server-log";
 import { plotIdentityKey } from "@/lib/plot-special-fields";
+import { mergeExistingPlotForImport } from "@/lib/import-merge";
 
 export const runtime = "nodejs";
 
@@ -48,11 +49,11 @@ export async function POST(request: Request) {
       Object.assign(importedCategories, parsed.categories);
       for (const original of parsed.plots) {
         const geoStem = fileStem(geoFile.name); const geoCad = cadastralDigits(original.properties.cadastralNumber);
-        const byStem = pdfs.find((pdf) => pdf.stem === geoStem); const byCad = pdfs.find((pdf) => cadastralDigits(pdf.metadata.cadastralNumber) === geoCad && geoCad.length === 19); const document = byCad ?? byStem;
+        const byStem = pdfs.find((pdf) => pdf.stem === geoStem); const byCad = pdfs.find((pdf) => cadastralDigits(pdf.metadata.cadastralNumber) === geoCad && geoCad.length === 19); let document = byCad ?? byStem;
         if (document && geoCad.length === 19 && document.metadata.cadastralNumber && cadastralDigits(document.metadata.cadastralNumber) !== geoCad) throw new Error(`Кадастровий номер у ${geoFile.name} не збігається з ${document.file.name}.`);
         if (document) usedPdfs.add(document.file.name);
         const metadata = document?.metadata;
-        const feature: PlotFeature = { ...original, properties: { ...original.properties, cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber, areaHa: metadata?.areaHa || original.properties.areaHa, owner: metadata?.owner || original.properties.owner, lessee: metadata?.lessee || original.properties.lessee, documentActualAt: metadata?.documentActualAt || original.properties.documentActualAt, sourceFilename: geoStem } };
+        let feature: PlotFeature = { ...original, properties: { ...original.properties, cadastralNumber: metadata?.cadastralNumber || original.properties.cadastralNumber, areaHa: metadata?.areaHa || original.properties.areaHa, owner: metadata?.owner || original.properties.owner, lessee: metadata?.lessee || original.properties.lessee, documentActualAt: metadata?.documentActualAt || original.properties.documentActualAt, sourceFilename: geoStem } };
         if (feature.properties.status && !knownStatuses.has(feature.properties.status)) {
           warnings.push(`${geoFile.name}: статус «${feature.properties.status}» відсутній у довіднику; ділянку імпортовано без статусу.`);
           feature.properties.status = "";
@@ -71,26 +72,9 @@ export async function POST(request: Request) {
         batchCadastrals.add(identity);
         const existing = existingByIdentity.get(identity);
         if (existing) {
-          feature.properties.id = existing.id;
-          if (!(feature.properties.resultLinks?.length)) feature.properties.resultLinks = existing.resultLinks;
-          if (!document) Object.assign(feature.properties, {
-            owner: feature.properties.owner || existing.owner,
-            lessee: feature.properties.lessee || existing.lessee,
-            documentActualAt: feature.properties.documentActualAt || existing.documentActualAt,
-          });
-          Object.assign(feature.properties, {
-            roadOwnershipType: feature.properties.roadOwnershipType || existing.roadOwnershipType,
-            servitudeValidFrom: feature.properties.servitudeValidFrom || existing.servitudeValidFrom,
-            servitudeValidUntil: feature.properties.servitudeValidUntil || existing.servitudeValidUntil,
-            servitudePaymentAmount: feature.properties.servitudePaymentAmount ?? (existing.servitudePaymentAmount === null ? null : Number(existing.servitudePaymentAmount)),
-            servitudePaymentPeriod: feature.properties.servitudePaymentPeriod || existing.servitudePaymentPeriod,
-            substationType: feature.properties.substationType || existing.substationType,
-            substationCapacityMw: feature.properties.substationCapacityMw ?? (existing.substationCapacityMw === null ? null : Number(existing.substationCapacityMw)),
-          });
-          if (!(feature.properties.statusProgress?.length) && !feature.properties.status) {
-            feature.properties.status = existing.status;
-            feature.properties.statusProgress = existing.statusProgress;
-          }
+          const merged = mergeExistingPlotForImport(feature, plotRowToFeature(existing), { incomingDocumentName: document?.file.name, decisions: feature.properties.importDecisions });
+          feature = merged.plot;
+          if (!merged.includeDocument) document = undefined;
         }
         const completedStatusIds = new Set((feature.properties.statusProgress ?? []).map(({ statusId }) => statusId));
         feature.properties.status = [...statusRows].reverse().find(({ id }) => completedStatusIds.has(id))?.name ?? "";
@@ -130,7 +114,7 @@ export async function POST(request: Request) {
       await db.transaction(async (tx) => {
         for (const [id, item] of Object.entries(importedCategories)) {
           const systemRole = defaultCategories[id]?.systemRole ?? null;
-          await tx.insert(category).values({ workspace, id, ...item, systemRole }).onConflictDoUpdate({ target: [category.workspace, category.id], set: { name: item.name, description: item.description, color: item.color, visible: item.visible } });
+          await tx.insert(category).values({ workspace, id, ...item, systemRole }).onConflictDoNothing({ target: [category.workspace, category.id] });
         }
         for (const item of prepared) {
           const values = { ...featureToPlotValues(item.feature), pdfObjectKey: item.pdfObjectKey };

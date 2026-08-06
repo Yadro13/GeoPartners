@@ -2,6 +2,7 @@ import type { FeatureCollection, Polygon } from "geojson";
 import type { PlotStatusProgress } from "@/lib/plot-status-progress";
 import type { PlotResultLink, PlotResultType } from "@/lib/plot-result-links";
 import type { RoadOwnershipType, ServitudePaymentPeriod } from "@/lib/plot-special-fields";
+import type { ImportDecisions } from "@/lib/import-merge";
 
 export const categorySystemRoles = ["default", "main_candidate", "alternative_candidate", "wtg_result", "road_result", "servitude_result", "substation_result"] as const;
 export type CategorySystemRole = (typeof categorySystemRoles)[number];
@@ -31,6 +32,7 @@ export type PlotProperties = {
   documentName?: string;
   documentUrl?: string;
   hasDocument?: boolean;
+  importDecisions?: ImportDecisions;
 };
 
 export type CategoryDefinition = { name: string; description: string; color: string; visible: boolean; systemRole?: CategorySystemRole | null };
