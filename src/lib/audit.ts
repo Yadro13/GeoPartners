@@ -61,6 +61,7 @@ const plotFieldLabels: Record<string, string> = {
   owner: "Власник",
   lessee: "Орендар",
   documentActualAt: "Дата актуальності документа",
+  resultLinks: "Зв'язки з результатами робіт",
   geometry: "Контур",
   document: "Документ",
 };
@@ -98,6 +99,7 @@ function plotSnapshot(plot: PlotFeature): Record<string, unknown> {
     owner: properties.owner,
     lessee: properties.lessee,
     documentActualAt: properties.documentActualAt,
+    resultLinks: properties.resultLinks ?? [],
     geometry: plot.geometry,
     document: properties.documentName ?? properties.hasDocument ?? false,
   };

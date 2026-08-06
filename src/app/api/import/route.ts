@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         const existing = existingByCadastral.get(cadastral);
         if (existing) {
           feature.properties.id = existing.id;
+          if (!(feature.properties.resultLinks?.length)) feature.properties.resultLinks = existing.resultLinks;
           if (!document) Object.assign(feature.properties, {
             owner: feature.properties.owner || existing.owner,
             lessee: feature.properties.lessee || existing.lessee,
@@ -118,7 +119,10 @@ export async function POST(request: Request) {
         await putDocument(item.pdfObjectKey, item.document.buffer); uploadedKeys.push(item.pdfObjectKey);
       }
       await db.transaction(async (tx) => {
-        for (const [id, item] of Object.entries(importedCategories)) await tx.insert(category).values({ workspace, id, ...item }).onConflictDoUpdate({ target: [category.workspace, category.id], set: item });
+        for (const [id, item] of Object.entries(importedCategories)) {
+          const systemRole = defaultCategories[id]?.systemRole ?? null;
+          await tx.insert(category).values({ workspace, id, ...item, systemRole }).onConflictDoUpdate({ target: [category.workspace, category.id], set: { name: item.name, description: item.description, color: item.color, visible: item.visible } });
+        }
         for (const item of prepared) {
           const values = { ...featureToPlotValues(item.feature), pdfObjectKey: item.pdfObjectKey };
           if (item.existing) await tx.update(plot).set(values).where(and(eq(plot.workspace, workspace), eq(plot.id, item.existing.id)));

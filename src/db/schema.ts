@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
 import { boolean, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { CategorySystemRole } from "@/data/demo";
+import type { PlotResultLink } from "@/lib/plot-result-links";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const userAccessLevelEnum = pgEnum("user_access_level", ["read", "edit"]);
@@ -127,10 +129,14 @@ export const category = pgTable(
     description: text("description").default("").notNull(),
     color: text("color").notNull(),
     visible: boolean("visible").default(true).notNull(),
+    systemRole: text("system_role").$type<CategorySystemRole>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   },
-  (table) => [primaryKey({ name: "category_workspace_id_pk", columns: [table.workspace, table.id] })],
+  (table) => [
+    primaryKey({ name: "category_workspace_id_pk", columns: [table.workspace, table.id] }),
+    uniqueIndex("category_workspace_system_role_idx").on(table.workspace, table.systemRole),
+  ],
 );
 
 export const plotStatus = pgTable(
@@ -167,6 +173,7 @@ export const plot = pgTable(
     owner: text("owner").default("").notNull(),
     lessee: text("lessee").default("").notNull(),
     documentActualAt: text("document_actual_at").default("").notNull(),
+    resultLinks: jsonb("result_links").$type<PlotResultLink[]>().default([]).notNull(),
     sourceFilename: text("source_filename"),
     pdfObjectKey: text("pdf_object_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

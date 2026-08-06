@@ -71,6 +71,13 @@
       "when": 1785963179994,
       "tag": "0009_glamorous_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786010973089,
+      "tag": "0010_giant_iron_fist",
+      "breakpoints": true
     }
   ]
 }

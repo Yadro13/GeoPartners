@@ -1,5 +1,9 @@
 import type { FeatureCollection, Polygon } from "geojson";
 import type { PlotStatusProgress } from "@/lib/plot-status-progress";
+import type { PlotResultLink, PlotResultType } from "@/lib/plot-result-links";
+
+export const categorySystemRoles = ["default", "main_candidate", "alternative_candidate", "wtg_result", "road_result", "servitude_result", "substation_result"] as const;
+export type CategorySystemRole = (typeof categorySystemRoles)[number];
 
 export type PlotProperties = {
   id: string;
@@ -12,6 +16,7 @@ export type PlotProperties = {
   owner: string;
   lessee: string;
   documentActualAt?: string;
+  resultLinks?: PlotResultLink[];
   status?: string;
   statusProgress?: PlotStatusProgress[];
   sourceFilename?: string;
@@ -20,14 +25,23 @@ export type PlotProperties = {
   hasDocument?: boolean;
 };
 
-export type CategoryDefinition = { name: string; description: string; color: string; visible: boolean };
+export type CategoryDefinition = { name: string; description: string; color: string; visible: boolean; systemRole?: CategorySystemRole | null };
 
 export const defaultCategories: Record<string, CategoryDefinition> = {
-  default: { name: "Без категорії", description: "", color: "#2f86a6", visible: true },
-  planned_wtg: { name: "Заплановано під ВЕУ", description: "", color: "#c67b18", visible: true },
-  wtg: { name: "ВЕУ", description: "", color: "#2a9461", visible: true },
-  alt_candidates: { name: "Альтернативний кандидат", description: "", color: "#8055a6", visible: true },
-  roads: { name: "Дороги", description: "", color: "#66756d", visible: true },
+  default: { name: "Без категорії", description: "", color: "#2f86a6", visible: true, systemRole: "default" },
+  planned_wtg: { name: "Основний кандидат", description: "", color: "#c67b18", visible: true, systemRole: "main_candidate" },
+  wtg: { name: "ВЕУ", description: "", color: "#2a9461", visible: true, systemRole: "wtg_result" },
+  alt_candidates: { name: "Альтернативний кандидат", description: "", color: "#8055a6", visible: true, systemRole: "alternative_candidate" },
+  roads: { name: "Дороги", description: "", color: "#66756d", visible: true, systemRole: "road_result" },
+  servitudes: { name: "Сервітути під ЛЕП", description: "", color: "#2f7990", visible: true, systemRole: "servitude_result" },
+  substations: { name: "Підстанції", description: "", color: "#a44f52", visible: true, systemRole: "substation_result" },
+};
+
+export const resultTypeByCategoryRole: Partial<Record<CategorySystemRole, PlotResultType>> = {
+  wtg_result: "wtg",
+  road_result: "road",
+  servitude_result: "servitude",
+  substation_result: "substation",
 };
 
 export const categoryMeta = defaultCategories;
@@ -52,6 +66,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         owner: "Демо-власник",
         lessee: "Демо-орендар",
         documentActualAt: "2026-05-02T12:56:00",
+        resultLinks: [],
       },
     },
     {
@@ -71,6 +86,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         owner: "Демо-власник",
         lessee: "Демо-орендар",
         documentActualAt: "2026-05-02T12:56:00",
+        resultLinks: [{ type: "wtg", number: "1" }],
         status: "обрана ділянка як варіант",
         statusProgress: [{ statusId: "status_01", completedAt: "2026-07-22T09:30:00.000Z", cost: null }],
       },
@@ -92,6 +108,7 @@ export const demoPlots: FeatureCollection<Polygon, PlotProperties> = {
         owner: "Демо-власник",
         lessee: "Демо-орендар",
         documentActualAt: "2026-05-02T12:55:00",
+        resultLinks: [{ type: "wtg", number: "1" }],
       },
     },
   ],

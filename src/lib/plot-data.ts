@@ -3,6 +3,7 @@ import { defaultCategories, type CategoryDefinition, type PlotProperties } from 
 import type { PlotFeature } from "@/components/workspace/types";
 import { calculatePolygonAreaHa } from "@/lib/geometry";
 import { parsePlotStatusProgress, totalPlotStatusCost } from "@/lib/plot-status-progress";
+import { parsePlotResultLinks } from "@/lib/plot-result-links";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -69,6 +70,7 @@ function normalizeFeature(raw: unknown, filename: string, index: number): PlotFe
         owner: textValue(properties.owner),
         lessee: textValue(properties.lessee),
         documentActualAt: textValue(properties.documentActualAt ?? properties.document_actual_at),
+        resultLinks: parsePlotResultLinks(properties.resultLinks ?? properties.result_links),
         status: textValue(properties.status),
         statusProgress: parsePlotStatusProgress(properties.statusProgress ?? properties.status_progress),
         sourceFilename: textValue(properties.sourceFilename) || sourceStem,
@@ -110,6 +112,7 @@ function normalizeCategories(value: unknown) {
       description: textValue(item.description).slice(0, 500),
       color: /^#[0-9a-f]{6}$/i.test(textValue(item.color)) ? textValue(item.color) : "#2f86a6",
       visible: item.visible !== false,
+      systemRole: null,
     } satisfies CategoryDefinition]];
   }));
 }
@@ -129,14 +132,18 @@ export function downloadText(content: string, filename: string, type: string) {
 
 export function plotsToCsv(plots: PlotFeature[]) {
   const rows = [
-    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пройдені етапи", "Загальні витрати, грн"],
-    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, properties.statusProgress?.length ?? 0, totalPlotStatusCost(properties.statusProgress)]),
+    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пов'язані результати", "Пройдені етапи", "Загальні витрати, грн"],
+    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, parsePlotResultLinks(properties.resultLinks).map(({ type, number }) => `${type}: ${number}`).join(", "), properties.statusProgress?.length ?? 0, totalPlotStatusCost(properties.statusProgress)]),
   ];
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
 }
 
 export function categoriesWithDefaults(categories: Record<string, CategoryDefinition>) {
-  return { ...defaultCategories, ...categories };
+  const merged = { ...defaultCategories, ...categories };
+  for (const [id, definition] of Object.entries(defaultCategories)) {
+    merged[id] = { ...definition, ...categories[id], systemRole: definition.systemRole };
+  }
+  return merged;
 }
 
 function csvCell(value: unknown) {

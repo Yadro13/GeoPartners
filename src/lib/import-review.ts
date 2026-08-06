@@ -64,6 +64,7 @@ export async function inspectImportPackage(files: File[], existingPlots: PlotFea
         const existing = existingPlots.find(({ properties }) => digits(properties.cadastralNumber) === finalDigits && finalDigits.length === 19);
         if (existing) {
           plot.properties.id = existing.properties.id;
+          if (!(plot.properties.resultLinks?.length)) plot.properties.resultLinks = existing.properties.resultLinks ?? [];
           if (!document) Object.assign(plot.properties, {
             owner: plot.properties.owner || existing.properties.owner,
             lessee: plot.properties.lessee || existing.properties.lessee,

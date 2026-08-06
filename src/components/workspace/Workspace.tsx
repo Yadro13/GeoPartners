@@ -56,7 +56,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     const normalizedQuery = query.trim().toLocaleLowerCase("uk");
     if (!normalizedQuery) return plots;
     const statusNames = new Map(plotStatuses.map(({ id, name }) => [id, name]));
-    return plots.filter(({ properties }) => [properties.cadastralNumber, properties.name, properties.owner, properties.lessee, ...(properties.statusProgress ?? []).map(({ statusId }) => statusNames.get(statusId) ?? "")].join(" ").toLocaleLowerCase("uk").includes(normalizedQuery));
+    return plots.filter(({ properties }) => [properties.cadastralNumber, properties.name, properties.owner, properties.lessee, ...(properties.resultLinks ?? []).map(({ number }) => number), ...(properties.statusProgress ?? []).map(({ statusId }) => statusNames.get(statusId) ?? "")].join(" ").toLocaleLowerCase("uk").includes(normalizedQuery));
   }, [plotStatuses, plots, query]);
   const selectedPlot = plots.find(({ properties }) => properties.id === selectedId) ?? null;
 
@@ -91,12 +91,14 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   const persistCategories = useCallback(async (next: Record<string, CategoryDefinition>) => {
     if (!canManageCategories) { setToast(t("categoryAdminOnly")); return false; }
     try {
+      let saved = categoriesWithDefaults(next);
       if (!preview) {
         const response = await fetch("/api/categories", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
         const body = await response.json().catch(() => null);
         if (!response.ok) throw new Error(body?.error ?? t("categoriesSaveFailed"));
+        saved = categoriesWithDefaults(body as Record<string, CategoryDefinition>);
       }
-      setCategories(next);
+      setCategories(saved);
       return true;
     } catch (reason) {
       setToast(reason instanceof Error ? reason.message : t("categorySaveFailed"));
@@ -136,7 +138,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     const mergedCategories = categoriesWithDefaults({ ...categories, ...result.categories });
     const prepared = result.plots.map((imported) => {
       const duplicate = plots.find(({ properties }) => properties.cadastralNumber === imported.properties.cadastralNumber);
-      return duplicate ? { ...imported, properties: { ...imported.properties, id: duplicate.properties.id, status: imported.properties.status || duplicate.properties.status, statusProgress: imported.properties.statusProgress?.length ? imported.properties.statusProgress : duplicate.properties.statusProgress } } : imported;
+      return duplicate ? { ...imported, properties: { ...imported.properties, id: duplicate.properties.id, resultLinks: imported.properties.resultLinks?.length ? imported.properties.resultLinks : duplicate.properties.resultLinks, status: imported.properties.status || duplicate.properties.status, statusProgress: imported.properties.statusProgress?.length ? imported.properties.statusProgress : duplicate.properties.statusProgress } } : imported;
     });
     const finalPlots = new Map(plots.map((plot) => [plot.properties.id, plot]));
     for (const item of prepared) finalPlots.set(item.properties.id, item);
@@ -238,8 +240,8 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     restoreAuditEntry,
     exportGeoJson, exportCsv, setBaseMap,
     toggleCategory: (id, visible) => { if (canManageCategories) updateCategory(id, { visible }); else setCategories((current) => ({ ...current, [id]: { ...current[id], visible } })); }, updateCategory,
-    addCategory: () => { const id = `category_${Date.now()}`; void persistCategories({ ...categories, [id]: { name: t("newCategory"), description: "", color: "#3979a8", visible: true } }); },
-    removeCategory: (id) => { if (id === "default" || !window.confirm(t("confirmDeleteCategory", { name: categories[id]?.name }))) return; const next = { ...categories }; delete next[id]; void persistCategories(next).then((saved) => { if (saved) setPlots((current) => current.map((plot) => plot.properties.category === id ? { ...plot, properties: { ...plot.properties, category: "default" } } : plot)); }); },
+    addCategory: () => { const id = `category_${Date.now()}`; void persistCategories({ ...categories, [id]: { name: t("newCategory"), description: "", color: "#3979a8", visible: true, systemRole: null } }); },
+    removeCategory: (id) => { if (categories[id]?.systemRole || !window.confirm(t("confirmDeleteCategory", { name: categories[id]?.name }))) return; const next = { ...categories }; delete next[id]; void persistCategories(next).then((saved) => { if (saved) setPlots((current) => current.map((plot) => plot.properties.category === id ? { ...plot, properties: { ...plot.properties, category: "default" } } : plot)); }); },
     savePlotStatuses: persistPlotStatuses,
     setWorkspace, setTestWorkspaceEnabled, clearSandbox,
   };

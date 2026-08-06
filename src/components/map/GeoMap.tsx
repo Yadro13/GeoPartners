@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, Tooltip, ZoomControl, useMap } from "react-leaflet";
 import type { PathOptions } from "leaflet";
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";
@@ -20,13 +20,31 @@ type GeoMapProps = {
   validationMarkers?: GeometryValidationMarker[];
 };
 
-function FitPlots({ plots }: { plots: PlotFeature[] }) {
+function ManageViewport({ plots, selectedId }: { plots: PlotFeature[]; selectedId: string | null }) {
   const map = useMap();
+  const fitted = useRef(false);
+  const previousSelectedId = useRef(selectedId);
 
   useEffect(() => {
+    if (fitted.current) return;
     const bounds = plots.flatMap((feature) => feature.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]));
-    if (bounds.length) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 15 });
+    if (bounds.length) {
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 15 });
+      fitted.current = true;
+    }
   }, [map, plots]);
+
+  useEffect(() => {
+    const selectionChanged = previousSelectedId.current !== selectedId;
+    previousSelectedId.current = selectedId;
+    if (!fitted.current || !selectionChanged || !selectedId) return;
+    const selected = plots.find(({ properties }) => properties.id === selectedId);
+    if (!selected) return;
+    const points = selected.geometry.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
+    const latitude = points.reduce((sum, [lat]) => sum + lat, 0) / points.length;
+    const longitude = points.reduce((sum, [, lng]) => sum + lng, 0) / points.length;
+    map.panTo([latitude, longitude], { animate: true });
+  }, [map, plots, selectedId]);
 
   return null;
 }
@@ -79,7 +97,7 @@ export function GeoMap({ selectedId, onSelect, compact = false, plots, categorie
       />
       {overlapFeatures.length ? <GeoJSON key={`overlaps-${overlapFeatures.length}-${dataKey}`} data={{ type: "FeatureCollection", features: overlapFeatures } as FeatureCollection<Polygon | MultiPolygon>} interactive={false} style={{ className: "map-conflict-area", color: "#8a5b08", dashArray: "3 3", fillColor: "#f2b642", fillOpacity: 0.46, weight: 2 }} /> : null}
       {validationMarkers.map((marker, index) => <CircleMarker key={`${marker.level}-${marker.coordinates.join("-")}-${index}`} center={[marker.coordinates[1], marker.coordinates[0]]} radius={marker.level === "error" ? 7 : 5} pathOptions={{ className: `map-validation-marker map-validation-marker--${marker.level}`, color: marker.level === "error" ? "#8f1f1f" : "#8a5b08", fillColor: marker.level === "error" ? "#ef4e4e" : "#f2b642", fillOpacity: 0.88, weight: 2 }}><Tooltip direction="top">{marker.message}</Tooltip></CircleMarker>)}
-      <FitPlots plots={visiblePlots} />
+      <ManageViewport plots={visiblePlots} selectedId={selectedId} />
     </MapContainer>
   );
 }

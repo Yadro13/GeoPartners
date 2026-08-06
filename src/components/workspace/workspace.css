@@ -1610,6 +1610,70 @@
   grid-column: 1 / -1;
 }
 
+.result-links-editor {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+  padding: 12px 0;
+}
+
+.result-links-editor legend {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0;
+}
+
+.result-links-editor > p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 2px 0 10px;
+}
+
+.result-link-row {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1.3fr);
+  padding: 7px 0;
+}
+
+.result-link-row__toggle {
+  align-items: center;
+  color: var(--ink) !important;
+  flex-direction: row !important;
+  min-height: 40px;
+}
+
+.result-link-row__toggle input {
+  min-height: 0;
+}
+
+.result-link-row__numbers,
+.result-link-row__numbers > div {
+  display: grid;
+  gap: 6px;
+}
+
+.result-link-row__numbers > div {
+  grid-template-columns: 1fr 40px;
+}
+
+.result-link-row__add {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--green-dark);
+  display: inline-flex;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 5px;
+  justify-self: start;
+  padding: 4px 0;
+}
+
 .form-actions {
   align-items: center;
   border-top: 1px solid var(--line);
@@ -3068,12 +3132,23 @@
 }
 
 .details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   margin: 0;
 }
 
 .details-grid div {
   border-bottom: 1px solid #e8ece9;
-  padding: 13px 0;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.details-grid div:nth-child(odd):not(.details-grid__wide) {
+  padding-right: 8px;
+}
+
+.details-grid__wide {
+  grid-column: 1 / -1;
 }
 
 .details-grid dt {
@@ -3094,6 +3169,17 @@
   gap: 8px;
   grid-template-columns: 1fr 1fr;
   margin-top: 18px;
+}
+
+.result-links-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+}
+
+.result-links-summary span {
+  display: inline-flex;
+  gap: 4px;
 }
 
 .plot-details__stages {
@@ -3458,6 +3544,12 @@
 
 .plot-details[data-compact="true"] {
   padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 899px) {
+  .result-link-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .plot-details[data-compact="true"] .plot-details__header {

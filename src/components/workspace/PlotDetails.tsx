@@ -3,6 +3,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
+import { parsePlotResultLinks, type PlotResultType } from "@/lib/plot-result-links";
 import type { PlotFeature } from "./types";
 
 type PlotDetailsProps = {
@@ -27,6 +28,8 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, o
   const category = categories[properties.category] ?? categories.default ?? { name: properties.category, color: "#2f86a6" };
   const completedStages = properties.statusProgress ?? [];
   const totalCost = totalPlotStatusCost(completedStages);
+  const resultLinks = parsePlotResultLinks(properties.resultLinks);
+  const resultLabels: Record<PlotResultType, string> = { wtg: t("resultWtg"), road: t("resultRoad"), servitude: t("resultServitude"), substation: t("resultSubstation") };
 
   return (
     <div className="plot-details" data-compact={compact}>
@@ -50,8 +53,9 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, o
         <div><dt>{t("stages")}</dt><dd>{t("stagesDone", { done: completedStages.length, total: plotStatuses.length })}</dd></div>
         {properties.documentActualAt ? <div><dt>{t("documentActualAt")}</dt><dd>{format.dateTime(new Date(properties.documentActualAt), { dateStyle: "medium", timeStyle: "short" })}</dd></div> : null}
         {totalCost > 0 ? <div><dt>{t("totalExpenses")}</dt><dd>{format.number(totalCost, { style: "currency", currency: "UAH" })}</dd></div> : null}
-        <div><dt>{t("owner")}</dt><dd>{properties.owner}</dd></div>
-        <div><dt>{t("lessee")}</dt><dd>{properties.lessee}</dd></div>
+        <div className="details-grid__wide"><dt>{t("owner")}</dt><dd>{properties.owner || t("notSpecified")}</dd></div>
+        <div className="details-grid__wide"><dt>{t("lessee")}</dt><dd>{properties.lessee || t("notSpecified")}</dd></div>
+        {resultLinks.length ? <div className="details-grid__wide"><dt>{t("resultLinks")}</dt><dd className="result-links-summary">{resultLinks.map((link, index) => <span key={`${link.type}-${link.number}-${index}`}><strong>{resultLabels[link.type]}</strong>{link.number}</span>)}</dd></div> : null}
       </dl>
 
       <div className="plot-details__actions">

@@ -6,6 +6,7 @@ import { MapCanvas } from "@/components/map/MapCanvas";
 import { WorkspaceModal } from "@/components/workspace/WorkspaceModal";
 import { calculatePolygonAreaHa } from "@/lib/geometry";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
+import { parsePlotResultLinks, type PlotResultType } from "@/lib/plot-result-links";
 import type { VersionComparison } from "@/lib/audit";
 import type { BaseMapId, PlotFeature } from "./types";
 
@@ -14,7 +15,7 @@ export function VersionCompareDialog({ comparison, baseMap, busy, error, onClose
   const common = useTranslations("common");
   const format = useFormatter();
   const mapPlots = comparison.current ? [comparisonFeature(comparison.target, "version-target", "version-target"), comparisonFeature(comparison.current, "version-current", "version-current")] : [comparisonFeature(comparison.target, "version-target", "version-target")];
-  const labels: VersionLabels = { cadastral: t("cadastral"), name: t("name"), category: t("category"), area: t("area"), outlineArea: t("outlineArea"), capacity: t("capacity"), stagesCosts: t("stagesCosts"), mainCandidate: t("mainCandidate"), owner: t("owner"), lessee: t("lessee"), documentActualAt: t("documentActualAt"), outline: t("outline"), document: t("document"), missing: t("missing"), notDefined: common("notDefined"), points: (count) => t("points", { count }), stageSummary: (count, cost) => t("stageSummary", { count, cost }) };
+  const labels: VersionLabels = { cadastral: t("cadastral"), name: t("name"), category: t("category"), area: t("area"), outlineArea: t("outlineArea"), stagesCosts: t("stagesCosts"), resultLinks: t("resultLinks"), resultTypes: { wtg: t("resultWtg"), road: t("resultRoad"), servitude: t("resultServitude"), substation: t("resultSubstation") }, owner: t("owner"), lessee: t("lessee"), documentActualAt: t("documentActualAt"), outline: t("outline"), document: t("document"), missing: t("missing"), notDefined: common("notDefined"), points: (count) => t("points", { count }), stageSummary: (count, cost) => t("stageSummary", { count, cost }) };
   const differences = compareFields(comparison.current, comparison.target, labels, (value, options) => format.number(value, options)); const blocked = comparison.blockingMessages.length > 0;
   const overlapFeatures = comparison.conflicts.map(({ geometry }) => ({ type: "Feature" as const, properties: {}, geometry }));
   return <WorkspaceModal title={t("title")} description={comparison.target.properties.cadastralNumber} onClose={onClose} wide><div className="version-compare">
@@ -26,7 +27,7 @@ export function VersionCompareDialog({ comparison, baseMap, busy, error, onClose
 
 function comparisonFeature(plot: PlotFeature, id: string, category: string): PlotFeature { return { ...plot, properties: { ...plot.properties, id, category } }; }
 
-type VersionLabels = { cadastral: string; name: string; category: string; area: string; outlineArea: string; capacity: string; stagesCosts: string; mainCandidate: string; owner: string; lessee: string; documentActualAt: string; outline: string; document: string; missing: string; notDefined: string; points: (count: number) => string; stageSummary: (count: number, cost: string) => string };
+type VersionLabels = { cadastral: string; name: string; category: string; area: string; outlineArea: string; stagesCosts: string; resultLinks: string; resultTypes: Record<PlotResultType, string>; owner: string; lessee: string; documentActualAt: string; outline: string; document: string; missing: string; notDefined: string; points: (count: number) => string; stageSummary: (count: number, cost: string) => string };
 
 type NumberOptions = { minimumFractionDigits?: number; maximumFractionDigits?: number };
 
@@ -37,9 +38,8 @@ function compareFields(current: PlotFeature | null, target: PlotFeature, labels:
     [labels.category, current?.properties.category, target.properties.category],
     [labels.area, current ? `${formatNumber(current.properties.areaHa)} ha` : null, `${formatNumber(target.properties.areaHa)} ha`],
     [labels.outlineArea, current ? `${formatNumber(calculatePolygonAreaHa(current.geometry))} ha` : null, `${formatNumber(calculatePolygonAreaHa(target.geometry))} ha`],
-    [labels.capacity, current?.properties.projectCapacity, target.properties.projectCapacity],
     [labels.stagesCosts, current ? stageSummary(current, labels, formatNumber) : null, stageSummary(target, labels, formatNumber)],
-    [labels.mainCandidate, current?.properties.mainCandidateCadastral, target.properties.mainCandidateCadastral],
+    [labels.resultLinks, current ? resultLinksSummary(current, labels) : null, resultLinksSummary(target, labels)],
     [labels.owner, current?.properties.owner, target.properties.owner],
     [labels.lessee, current?.properties.lessee, target.properties.lessee],
     [labels.documentActualAt, current?.properties.documentActualAt, target.properties.documentActualAt],
@@ -51,5 +51,6 @@ function compareFields(current: PlotFeature | null, target: PlotFeature, labels:
 
 function coordinateCount(plot: PlotFeature) { return plot.geometry.coordinates.reduce((count, ring) => count + ring.length, 0); }
 function stageSummary(plot: PlotFeature, labels: VersionLabels, formatNumber: (value: number, options?: NumberOptions) => string) { const entries = plot.properties.statusProgress ?? []; return labels.stageSummary(entries.length, formatNumber(totalPlotStatusCost(entries), { minimumFractionDigits: 2, maximumFractionDigits: 2 })); }
+function resultLinksSummary(plot: PlotFeature, labels: VersionLabels) { return parsePlotResultLinks(plot.properties.resultLinks).map(({ type, number }) => `${labels.resultTypes[type]}: ${number}`).join(", "); }
 function normalize(value: unknown) { return value === null || value === undefined ? "" : String(value); }
 function display(value: unknown, fallback: string) { const text = normalize(value).trim(); return text || fallback; }

@@ -41,9 +41,9 @@ function CategorySetting({ id, category, actions, canManage }: { id: string; cat
   return <div className="category-setting">
     <input aria-label={t("showCategory", { name: category.name })} type="checkbox" checked={category.visible} onChange={(event) => actions.toggleCategory(id, event.target.checked)} />
     <input aria-label={t("categoryColor", { name: category.name })} type="color" value={category.color} disabled={!canManage} onChange={(event) => actions.updateCategory(id, { color: event.target.value })} />
-    <input aria-label={t("categoryName", { name: category.name })} value={name} disabled={!canManage || id === "default"} maxLength={120} onBlur={saveName} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+    <input aria-label={t("categoryName", { name: category.name })} value={name} disabled={!canManage} maxLength={120} onBlur={saveName} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
     {canManage ? <textarea aria-label={t("categoryDescription", { name: category.name })} value={description} maxLength={500} rows={2} placeholder={t("descriptionPlaceholder")} onBlur={saveDescription} onChange={(event) => setDescription(event.target.value)} /> : <p className="category-setting__description" data-empty={!category.description}>{category.description || t("descriptionMissing")}</p>}
-    <button className="icon-button" disabled={!canManage || id === "default"} type="button" onClick={() => actions.removeCategory(id)} aria-label={t("deleteCategory", { name: category.name })}><Trash2 size={17} /></button>
+    <button className="icon-button" disabled={!canManage || Boolean(category.systemRole)} type="button" onClick={() => actions.removeCategory(id)} aria-label={t("deleteCategory", { name: category.name })}><Trash2 size={17} /></button>
   </div>;
 }
 
