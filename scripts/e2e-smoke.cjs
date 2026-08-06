@@ -260,6 +260,14 @@ const additionalResultViews = {
   await page.getByRole("button", { name: "Відновити цю версію", exact: true }).click();
   await page.getByText("Версію успішно відновлено.", { exact: true }).waitFor();
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-audit-restore.png") });
+  await page.getByRole("button", { name: "Історичні знімки", exact: true }).click();
+  await page.getByRole("heading", { name: "Стан бази за датою", exact: true }).waitFor();
+  assert((await page.locator(".snapshot-kpi-row").count()) === 16, "historical snapshot renders all stage totals plus its header");
+  assert((await page.locator('.snapshot-delta[data-tone="positive"]').count()) >= 1, "historical snapshot highlights positive weekly changes");
+  await page.locator(".snapshot-map .leaflet-overlay-pane path").first().waitFor();
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF", exact: true }).click(), ".pdf", { fileTitle: "Історичний звіт" });
+  await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-snapshot-history.png"), fullPage: true });
+  await page.getByRole("button", { name: "Журнал змін", exact: true }).click();
   console.log("stage=audit");
 
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
@@ -579,6 +587,7 @@ const additionalResultViews = {
   assert((await page.getByRole("button", { name: "Імпорт", exact: true }).count()) === 0, "mobile user cannot open bulk import");
   await page.getByRole("button", { name: "Журнал", exact: true }).click();
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
+  assert((await page.getByRole("button", { name: "Історичні знімки", exact: true }).count()) === 0, "ordinary user cannot open historical snapshots");
   await page.locator(".audit-row summary").nth(1).click();
   assert((await page.getByRole("button", { name: "Порівняти та відновити", exact: true }).count()) === 0, "mobile user cannot restore versions");
   await page.getByRole("button", { name: "Звіти", exact: true }).click();

@@ -5,6 +5,7 @@ import { hasPermission } from "../src/lib/permissions.ts";
 import { defaultPlotStatuses } from "../src/data/plot-statuses.ts";
 import { parsePlotStatusProgress, totalPlotStatusCost } from "../src/lib/plot-status-progress.ts";
 import { structuredLog } from "./structured-log.mjs";
+import { isKyivSnapshotWindow } from "./snapshot-schedule-utils.mjs";
 
 let output = "";
 const originalInfo = console.info;
@@ -64,8 +65,6 @@ assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "statuses.mana
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "plots.delete"), false);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "plots.delete"), true);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "statuses.manage"), true);
-assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "snapshots.capture"), false);
-assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "snapshots.capture"), true);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "snapshots.view"), false);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "snapshots.view"), true);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "expenses.view"), false);
@@ -73,6 +72,9 @@ assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "expenses.mana
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "expenses.view"), true);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "expenses.manage"), true);
 assert(currentBackupTables.includes("workspace_snapshot"), "new backups require workspace_snapshot");
+assert.equal(isKyivSnapshotWindow(new Date("2026-08-07T20:00:00.000Z")), true);
+assert.equal(isKyivSnapshotWindow(new Date("2026-12-04T21:00:00.000Z")), true);
+assert.equal(isKyivSnapshotWindow(new Date("2026-08-07T19:55:00.000Z")), false);
 assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
   "обрана ділянка як варіант",
   "проведено перемовини з власником",

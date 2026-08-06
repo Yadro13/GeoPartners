@@ -8,7 +8,7 @@ import { PlotDetails } from "../PlotDetails";
 import { PlotList } from "../PlotList";
 import { LayersPanel, ProfilePanel, ReportsPanel } from "../WorkspacePanels";
 import type { WorkspaceViewProps } from "../types";
-import { AuditPanel } from "../AuditPanel";
+import { HistoryPanel } from "../HistoryPanel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { UserManagementPanel } from "@/components/admin/UserManagementPanel";
 
@@ -31,7 +31,7 @@ export function MobileWorkspace(props: WorkspaceViewProps) {
       {props.activeSection !== "users" && tab === "map" ? <div className="mobile-map"><MapCanvas compact plots={props.plots} categories={props.categories} baseMap={props.baseMap} selectedId={props.selectedId} onSelect={selectPlot} /><div className="mobile-map__counter">{t("plotCount", { count: props.plots.length })}</div><button className="mobile-layer-button" type="button" onClick={() => setLayersOpen(true)} aria-label={t("layers")}><Layers3 size={21} /></button>{props.canEditPlots ? <button className="mobile-add-button" type="button" onClick={props.actions.openAdd} aria-label={t("addPlot")}><Plus size={24} /></button> : null}</div> : null}
       {props.activeSection !== "users" && tab === "plots" ? <div className="mobile-list-view"><div className="mobile-view-heading"><div><span className="eyebrow">{t("workingSet")}</span><h1>{t("plots")}</h1></div>{isAdmin ? <button className="command-button" type="button" onClick={props.actions.openImport}><Upload size={17} />{t("import")}</button> : null}</div><PlotList plots={props.plots} selectedId={props.selectedId} onSelect={(id) => { selectPlot(id); const plot = props.plots.find(({ properties }) => properties.id === id); if (plot) props.actions.openCard(plot); }} categories={props.categories} /></div> : null}
       {props.activeSection !== "users" && tab === "reports" ? <ReportsPanel plots={props.plots} categories={props.categories} plotStatuses={props.plotStatuses} actions={props.actions} canViewExpenses={props.canViewExpenses} /> : null}
-      {props.activeSection !== "users" && tab === "history" ? <AuditPanel preview={props.preview} baseMap={props.baseMap} canRestore={isAdmin} onRestore={props.actions.restoreAuditEntry} workspace={props.workspace} /> : null}
+      {props.activeSection !== "users" && tab === "history" ? <HistoryPanel preview={props.preview} baseMap={props.baseMap} isAdmin={isAdmin} onRestore={props.actions.restoreAuditEntry} workspace={props.workspace} /> : null}
       {props.activeSection !== "users" && tab === "profile" ? <ProfilePanel user={props.user} googleEnabled={props.googleEnabled} preview={props.preview} workspace={props.workspace} testWorkspaceEnabled={props.testWorkspaceEnabled} plotStatuses={props.plotStatuses} actions={props.actions} /> : null}
     </section>
     {detailsOpen && tab === "map" ? <section className="mobile-sheet" aria-label={t("plotInfo")}><div className="mobile-sheet__handle" /><button className="mobile-sheet__close" type="button" onClick={() => setDetailsOpen(false)} aria-label={common("close")}><X size={20} /></button><PlotDetails compact plot={props.selectedPlot} categories={props.categories} plotStatuses={props.plotStatuses} canViewExpenses={props.canViewExpenses} onEdit={props.canEditPlots ? props.actions.openEdit : undefined} onOpenStages={props.actions.openStages} onDocuments={props.actions.openDocuments} onOpenCard={props.actions.openCard} /></section> : null}

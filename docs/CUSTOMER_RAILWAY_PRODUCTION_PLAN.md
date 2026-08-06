@@ -122,6 +122,7 @@ Railway production підключається до гілки `main`, а не д
 ```text
 EMAIL_USE_SMTP=false
 BREVO_API_KEY=<production secret>
+SNAPSHOT_CRON_SECRET=<random secret, at least 32 characters>
 ```
 
 У кожному сервісі мають з'явитися references:
@@ -129,6 +130,7 @@ BREVO_API_KEY=<production secret>
 ```text
 EMAIL_USE_SMTP=${{ shared.EMAIL_USE_SMTP }}
 BREVO_API_KEY=${{ shared.BREVO_API_KEY }}
+SNAPSHOT_CRON_SECRET=${{ shared.SNAPSHOT_CRON_SECRET }}
 ```
 
 На Railway Hobby використовується Brevo HTTPS API. SMTP-реквізити можна
@@ -172,11 +174,14 @@ BREVO_API_KEY=${{ shared.BREVO_API_KEY }}
 - production `GOOGLE_CLIENT_ID` і `GOOGLE_CLIENT_SECRET`;
 - Telegram variables, якщо web використовує пряме сповіщення;
 - шість `AWS_*` references із production Bucket.
+- `SNAPSHOT_CRON_SECRET=${{ shared.SNAPSHOT_CRON_SECRET }}` для закритого endpoint планувальника.
 
 ### Notifications
 
 - `DATABASE_URL=${{ Postgres.DATABASE_URL }}`;
 - `APP_URL`, `ADMIN_EMAIL`;
+- `SNAPSHOT_CRON_URL=https://YOUR_DOMAIN/api/internal/snapshots/run`;
+- `SNAPSHOT_CRON_SECRET=${{ shared.SNAPSHOT_CRON_SECRET }}`;
 - той самий `EMAIL_FROM` і HTTP provider;
 - shared reference `EMAIL_USE_SMTP`;
 - shared reference `BREVO_API_KEY`;

@@ -1,11 +1,13 @@
 import pg from "pg";
 import { createEmailSender } from "../src/lib/email-delivery.mjs";
 import { structuredError, structuredLog } from "./structured-log.mjs";
+import { isKyivSnapshotWindow } from "./snapshot-schedule-utils.mjs";
 
 const service = "geopartners-notifications";
 let pool = null;
 
 try {
+  await triggerWorkspaceSnapshots();
   if (!process.env.DATABASE_URL) throw Object.assign(new Error("Missing required configuration"), { code: "CONFIG_MISSING" });
   pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
   await dispatch(pool, createEmailSender());
@@ -14,6 +16,28 @@ try {
   process.exitCode = 1;
 } finally {
   await pool?.end();
+}
+
+async function triggerWorkspaceSnapshots() {
+  if (!isKyivSnapshotWindow()) return;
+  const url = process.env.SNAPSHOT_CRON_URL;
+  const secret = process.env.SNAPSHOT_CRON_SECRET;
+  if (!url || !secret) {
+    structuredLog(service, "warn", "snapshots.schedule.skipped", { reason: "not_configured" });
+    return;
+  }
+  try {
+    const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: "{}" });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error("Snapshot scheduler request failed"), { code: `HTTP_${response.status}` });
+    structuredLog(service, "info", body.due ? "snapshots.schedule.completed" : "snapshots.schedule.not_due", {
+      scheduleKey: body.scheduleKey,
+      created: Array.isArray(body.created) ? body.created.filter((item) => item.created).length : 0,
+      deleted: body.deleted ?? 0,
+    });
+  } catch (error) {
+    structuredLog(service, "warn", "snapshots.schedule.failed", structuredError(error));
+  }
 }
 
 async function dispatch(database, emailSender) {

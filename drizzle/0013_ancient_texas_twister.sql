@@ -1,0 +1,2 @@
+ALTER TABLE "workspace_snapshot" ADD COLUMN "schedule_key" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "workspace_snapshot_workspace_schedule_idx" ON "workspace_snapshot" USING btree ("workspace","schedule_key");

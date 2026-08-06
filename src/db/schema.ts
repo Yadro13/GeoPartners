@@ -240,10 +240,14 @@ export const workspaceSnapshot = pgTable(
     plotCount: integer("plot_count").notNull(),
     categoryCount: integer("category_count").notNull(),
     statusCount: integer("status_count").notNull(),
+    scheduleKey: text("schedule_key"),
     capturedBy: text("captured_by").references(() => user.id, { onDelete: "set null" }),
     capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("workspace_snapshot_workspace_captured_idx").on(table.workspace, table.capturedAt)],
+  (table) => [
+    index("workspace_snapshot_workspace_captured_idx").on(table.workspace, table.capturedAt),
+    uniqueIndex("workspace_snapshot_workspace_schedule_idx").on(table.workspace, table.scheduleKey),
+  ],
 );
 
 export const userRelations = relations(user, ({ many }) => ({

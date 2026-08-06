@@ -9,8 +9,8 @@ const serviceName = process.env.RAILWAY_SERVICE_NAME;
 if (environmentName !== "staging" || serviceName !== "geopartners-web") {
   throw new Error("This test is restricted to the Railway staging web service.");
 }
-if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) {
-  throw new Error("DATABASE_URL and BETTER_AUTH_SECRET are required.");
+if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET || !process.env.SNAPSHOT_CRON_SECRET) {
+  throw new Error("DATABASE_URL, BETTER_AUTH_SECRET and SNAPSHOT_CRON_SECRET are required.");
 }
 
 const runId = `${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
@@ -36,6 +36,7 @@ const serverOutput = [];
 let child;
 let databaseConnected = false;
 let snapshotId;
+let snapshotIds = [];
 
 class CookieJar {
   cookies = new Map();
@@ -369,16 +370,19 @@ async function run() {
   await request("/api/plots", { method: "POST", jar: adminJar, expected: [201], json: testPlot() });
   const sandboxPlots = await request("/api/plots", { jar: userJar });
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");
-  await request("/api/snapshots", { method: "POST", jar: userJar, expected: [403] });
-  const capturedSnapshot = await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [201] });
-  snapshotId = capturedSnapshot.payload.id;
-  assert(snapshotId && capturedSnapshot.payload.workspace === "sandbox" && capturedSnapshot.payload.plotCount >= 1, "Administrator snapshot metadata is invalid.");
+  await request("/api/snapshots", { method: "POST", jar: userJar, expected: [405] });
+  await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [405] });
+  const scheduledRun = await request("/api/internal/snapshots/run", { method: "POST", headers: { authorization: `Bearer ${process.env.SNAPSHOT_CRON_SECRET}` }, json: { force: true } });
+  snapshotIds = scheduledRun.payload.created?.map(({ id }) => id) ?? [];
+  snapshotId = scheduledRun.payload.created?.find(({ workspace }) => workspace === "sandbox")?.id;
+  assert(snapshotId && snapshotIds.length === 2, "Scheduled snapshot run did not capture both workspaces.");
   await request("/api/snapshots", { jar: userJar, expected: [403] });
   await request(`/api/snapshots/${snapshotId}`, { jar: userJar, expected: [403] });
   const snapshotList = await request("/api/snapshots", { jar: adminJar });
   assert(snapshotList.payload.items?.some((item) => item.id === snapshotId), "Administrator cannot list snapshots in the active workspace.");
   const snapshotDetail = await request(`/api/snapshots/${snapshotId}`, { jar: adminJar });
   assert(snapshotDetail.payload.payload?.plots?.some((item) => item.properties?.id === plotId), "Snapshot payload does not contain the captured plot.");
+  assert(snapshotDetail.payload.kpis?.plots?.current >= 1 && Array.isArray(snapshotDetail.payload.kpis?.statuses), "Snapshot KPI comparison is incomplete.");
   let immutableUpdateRejected = false;
   try {
     await client.query("update workspace_snapshot set plot_count = plot_count + 1 where id = $1", [snapshotId]);
@@ -493,7 +497,7 @@ async function cleanup() {
     try {
       const users = await client.query(`select id from "user" where email = any($1::text[])`, [testEmails]);
       const userIds = users.rows.map((row) => row.id);
-      if (snapshotId) await client.query("delete from workspace_snapshot where id = $1", [snapshotId]);
+      if (snapshotIds.length) await client.query("delete from workspace_snapshot where id = any($1::uuid[])", [snapshotIds]);
       await client.query(
         `delete from plot_version
           where plot_id = $1
