@@ -373,9 +373,11 @@ async function run() {
   const capturedSnapshot = await request("/api/snapshots", { method: "POST", jar: adminJar, expected: [201] });
   snapshotId = capturedSnapshot.payload.id;
   assert(snapshotId && capturedSnapshot.payload.workspace === "sandbox" && capturedSnapshot.payload.plotCount >= 1, "Administrator snapshot metadata is invalid.");
-  const snapshotList = await request("/api/snapshots", { jar: userJar });
-  assert(snapshotList.payload.items?.some((item) => item.id === snapshotId), "Approved user cannot list snapshots in the active workspace.");
-  const snapshotDetail = await request(`/api/snapshots/${snapshotId}`, { jar: userJar });
+  await request("/api/snapshots", { jar: userJar, expected: [403] });
+  await request(`/api/snapshots/${snapshotId}`, { jar: userJar, expected: [403] });
+  const snapshotList = await request("/api/snapshots", { jar: adminJar });
+  assert(snapshotList.payload.items?.some((item) => item.id === snapshotId), "Administrator cannot list snapshots in the active workspace.");
+  const snapshotDetail = await request(`/api/snapshots/${snapshotId}`, { jar: adminJar });
   assert(snapshotDetail.payload.payload?.plots?.some((item) => item.properties?.id === plotId), "Snapshot payload does not contain the captured plot.");
   let immutableUpdateRejected = false;
   try {
@@ -393,7 +395,7 @@ async function run() {
   const productionSnapshots = await request("/api/snapshots", { jar: adminJar });
   assert(!productionSnapshots.payload.items?.some((item) => item.id === snapshotId), "Sandbox snapshot leaked into the production workspace.");
   await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
-  logStep("workspace snapshot capture, read access, immutability and isolation passed");
+  logStep("admin-only workspace snapshot access, immutability and isolation passed");
 
   await request(`/api/admin/users/${applicant.id}`, {
     method: "PATCH",
@@ -406,16 +408,27 @@ async function run() {
   assert(statusCatalog.payload[0]?.name === "обрана ділянка як варіант", "Initial plot status order is invalid.");
   await request("/api/plot-statuses", { method: "PUT", jar: userJar, expected: [403], json: statusCatalog.payload });
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: statusName }] });
-  const completedAt = "2026-07-25T11:30:00.000Z";
-  const statusProgress = [
+  const administratorProgress = [
     { statusId: statusCatalog.payload[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 0 },
-    { statusId, completedAt, cost: 1250.5 },
+    { statusId, completedAt: "2026-07-24T11:30:00.000Z", cost: 1250.5 },
   ];
-  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Stages assigned by E2E editor", statusName, statusProgress) });
+  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: adminJar, json: testPlot("Stage expenses assigned by E2E administrator", statusName, administratorProgress) });
+  const editorVisiblePlot = await request("/api/plots", { jar: userJar });
+  const editorVisibleProgress = editorVisiblePlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress;
+  assert(editorVisibleProgress?.length === 2 && editorVisibleProgress.every((item) => !("cost" in item)), "Editor API response leaked stage expenses.");
+  const completedAt = "2026-07-25T11:30:00.000Z";
+  const editorProgress = [
+    { statusId: statusCatalog.payload[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 999999 },
+    { statusId, completedAt, cost: 999999 },
+  ];
+  await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Stages assigned by E2E editor", statusName, editorProgress) });
   const stagedPlot = await request("/api/plots", { jar: userJar });
   const stagedProperties = stagedPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
   assert(stagedProperties?.statusProgress?.length === 2, "Editor cannot save independently completed plot stages.");
-  assert(stagedProperties.statusProgress[1]?.completedAt === completedAt && stagedProperties.statusProgress[1]?.cost === 1250.5, "Plot stage datetime or expense was not persisted.");
+  assert(stagedProperties.statusProgress[1]?.completedAt === completedAt && stagedProperties.statusProgress.every((item) => !("cost" in item)), "Editor response leaked expenses or failed to persist the stage datetime.");
+  const administratorPlot = await request("/api/plots", { jar: adminJar });
+  const administratorProperties = administratorPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
+  assert(administratorProperties.statusProgress[0]?.cost === 0 && administratorProperties.statusProgress[1]?.cost === 1250.5, "Editor overwrote administrator-managed stage expenses.");
   const renamedStatus = `${statusName} renamed`;
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: renamedStatus }] });
   const renamedPlot = await request("/api/plots", { jar: userJar });

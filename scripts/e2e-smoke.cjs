@@ -581,6 +581,10 @@ const additionalResultViews = {
   await page.getByRole("heading", { name: "Журнал змін", exact: true }).waitFor();
   await page.locator(".audit-row summary").nth(1).click();
   assert((await page.getByRole("button", { name: "Порівняти та відновити", exact: true }).count()) === 0, "mobile user cannot restore versions");
+  await page.getByRole("button", { name: "Звіти", exact: true }).click();
+  await page.getByRole("heading", { name: "Зведений звіт", exact: true }).waitFor();
+  assert((await page.getByRole("button", { name: "Витрати", exact: true }).count()) === 0, "mobile user cannot view the expense report mode");
+  assert((await page.getByText("Витрати за етапами", { exact: true }).count()) === 0, "mobile user cannot view the expense summary");
   await page.getByRole("button", { name: "Карта", exact: true }).evaluate((element) => element.click());
   await page.getByRole("button", { name: "Шари", exact: true }).click();
   await page.getByText("Категорії захищено", { exact: true }).waitFor();
@@ -599,6 +603,16 @@ const additionalResultViews = {
   assert((await page.getByRole("button", { name: "Імпорт", exact: true }).count()) === 0, "desktop user cannot open bulk import");
   assert((await page.getByTitle("Додати ділянку").count()) === 0, "read-only desktop user cannot create plots");
   assert((await page.getByTitle("Редагувати ділянку").count()) === 0, "read-only desktop user cannot edit plots");
+  await page.getByTitle("Звіти").click();
+  await page.getByRole("heading", { name: "Зведений звіт", exact: true }).waitFor();
+  assert((await page.getByRole("button", { name: "Витрати", exact: true }).count()) === 0, "desktop user cannot view the expense report mode");
+  assert((await page.locator(".report-matrix__cost").count()) === 0, "desktop user report omits expense columns");
+  await expectDownload(page, () => page.getByRole("button", { name: "CSV", exact: true }).click(), ".csv", { includeExpenses: false });
+  await page.getByRole("button", { name: "За ділянками", exact: true }).click();
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити XLSX", exact: true }).click(), ".xlsx", { ...reportLocales.uk, includeExpenses: false });
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити PDF", exact: true }).click(), ".pdf", { ...reportLocales.uk, includeExpenses: false });
+  await expectDownload(page, () => page.getByRole("button", { name: "Завантажити DOCX", exact: true }).click(), ".docx", { ...reportLocales.uk, includeExpenses: false });
+  await verifyPrintReport(page, reportLocales.uk);
   await page.getByTitle("Профіль").click();
   await page.getByText("Тільки читання", { exact: true }).waitFor();
   await page.getByTitle("Карта").click();
@@ -626,13 +640,13 @@ const additionalResultViews = {
   const editorStageDate = page.getByRole("dialog").getByLabel("Дата й час: отримана згода власника", { exact: true });
   assert(Boolean(await editorStageDate.inputValue()), "checking a plot stage assigns the current datetime");
   await editorStageDate.fill("2026-07-25T14:30");
-  await page.getByRole("dialog").getByLabel("Витрати: отримана згода власника", { exact: true }).fill("1250.50");
+  assert((await page.getByRole("dialog").getByLabel("Витрати: отримана згода власника", { exact: true }).count()) === 0, "editor cannot view or change plot stage expenses");
   await page.getByRole("dialog").getByRole("button", { name: "Зберегти етапи", exact: true }).click();
   await page.getByText("Зміни ділянки збережено.", { exact: true }).waitFor();
   await page.getByRole("button", { name: /^Етапи \(/ }).click();
   assert(await page.getByRole("dialog").getByRole("checkbox", { name: /отримана згода власника/ }).isChecked(), "editor user can mark a non-sequential plot stage as completed");
   assert((await page.getByRole("dialog").getByLabel("Дата й час: отримана згода власника", { exact: true }).inputValue()) === "2026-07-25T14:30", "plot stage completion datetime persists");
-  assert(Number(await page.getByRole("dialog").getByLabel("Витрати: отримана згода власника", { exact: true }).inputValue()) === 1250.5, "plot stage expense persists");
+  assert((await page.getByRole("dialog").getByLabel("Витрати: отримана згода власника", { exact: true }).count()) === 0, "editor still cannot view plot stage expenses after save");
   await page.screenshot({ path: path.join(os.tmpdir(), "geopartners-desktop-plot-stages-edit.png") });
   await page.getByRole("dialog").getByRole("button", { name: "Скасувати", exact: true }).click();
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
@@ -730,8 +744,20 @@ async function expectDownload(page, action, extension, expected) {
         assert(workbook.worksheets[0].name === expected.matrixSheet, `Excel matrix sheet is localized as ${expected.matrixSheet}`);
         assert(workbook.worksheets[1].name === expected.detailsSheet, `Excel details sheet is localized as ${expected.detailsSheet}`);
         assert(workbook.worksheets[0].getCell("A1").value === expected.xlsxTitle, `Excel title is localized as ${expected.xlsxTitle}`);
-        assert(workbook.worksheets[0].getCell(expected.kind === "result" ? "H5" : "F5").numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
+        const firstStageCell = expected.includeExpenses === false ? expected.kind === "result" ? "G5" : "E5" : expected.kind === "result" ? "H5" : "F5";
+        assert(workbook.worksheets[0].getCell(firstStageCell).numFmt === expected.dateFormat, `Excel dates use ${expected.dateFormat}`);
+        if (expected.includeExpenses === false) {
+          const values = workbook.worksheets.flatMap((sheet) => {
+            const result = [];
+            sheet.eachRow((row) => row.eachCell({ includeEmpty: false }, (cell) => result.push(String(cell.value ?? ""))));
+            return result;
+          }).join(" ");
+          assert(!/витрати|expenses|ausgaben|1250[.,]5/i.test(values), "user Excel omits expense columns and values");
+        }
       }
+    } else if (extension === ".csv") {
+      const content = fs.readFileSync(target, "utf8");
+      if (expected?.includeExpenses === false) assert(!/витрати|expenses|ausgaben|1250[.,]5/i.test(content), "user CSV omits expense columns and values");
     } else if (extension === ".docx") {
       const archive = unzipSync(new Uint8Array(fs.readFileSync(target)));
       const documentXml = Buffer.from(archive["word/document.xml"]).toString("utf8");
@@ -742,18 +768,21 @@ async function expectDownload(page, action, extension, expected) {
       assert((documentXml.match(/<w:tblLayout w:type="autofit"\s*\/>/g) ?? []).length >= minimumTables, "DOCX tables allow Word to auto-fit preferred widths to their content");
       if (expected.kind === "result") {
         assert(tableGrids[0].length === 3 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "result DOCX candidate table uses the full page width");
-        assert(tableGrids[1].length === 3 && tableGrids[1][0] >= 4800, "result DOCX stage table prioritizes the stage description");
+        assert(tableGrids[1].length === (expected.includeExpenses === false ? 2 : 3) && tableGrids[1][0] >= 4800, "result DOCX stage table prioritizes the stage description");
       } else {
         assert(tableGrids[0].length === 4 && tableGrids[0].reduce((sum, width) => sum + width, 0) >= 9000, "DOCX plot table uses the full readable page width");
         assert(tableGrids[0][0] >= 2400 && tableGrids[0][1] >= 2400 && tableGrids[0][2] >= 1000, "DOCX plot columns have deliberate readable widths");
-        assert(tableGrids.slice(1).every((widths) => widths.length === 3 && widths[0] >= 4800 && widths[0] > widths[1] && widths[1] > widths[2]), "DOCX stage tables prioritize the stage description column");
+        if (expected.includeExpenses === false) assert(tableGrids.slice(1).every((widths) => widths.length === 2 && widths[0] >= 5800 && widths[0] > widths[1]), "user DOCX stage tables omit the expense column");
+        else assert(tableGrids.slice(1).every((widths) => widths.length === 3 && widths[0] >= 4800 && widths[0] > widths[1] && widths[1] > widths[2]), "DOCX stage tables prioritize the stage description column");
       }
+      if (expected.includeExpenses === false) assert(!/Витрати|Expenses|Ausgaben|1250[.,]5/i.test(documentXml), "user DOCX omits expense columns and values");
     } else if (extension === ".pdf") {
       const { PDFParse } = require("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(fs.readFileSync(target)) });
       try {
         const result = await parser.getText();
         assert(result.text.includes(expected.fileTitle), `PDF title is localized as ${expected.fileTitle}`);
+        if (expected.includeExpenses === false) assert(!/Витрати|Expenses|Ausgaben|1250[.,]5/i.test(result.text), "user PDF omits expense columns and values");
       } finally {
         await parser.destroy();
       }

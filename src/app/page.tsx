@@ -9,6 +9,8 @@ import { categoryRowsToRecord, plotRowToFeature } from "@/lib/plots";
 import { getWorkspaceContext } from "@/lib/data-workspace";
 import { normalizeAppLocale } from "@/i18n/server-locale";
 import type { WorkspaceSection } from "@/components/workspace/types";
+import { hasPermission } from "@/lib/permissions";
+import { plotForExpenseAccess } from "@/lib/plot-expenses";
 
 const workspaceSections = new Set<WorkspaceSection>(["map", "layers", "reports", "history", "users", "settings", "profile"]);
 
@@ -30,5 +32,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const initialSection = requestedSection === "users" && currentUser.role !== "admin" ? "map" : requestedSection;
   const protectedEmail = process.env.ADMIN_EMAIL?.toLocaleLowerCase();
   const initialUsers = managedUserRows.map(({ account, registrationRequestId }) => ({ id: account.id, name: account.name, email: account.email, role: account.role, accessLevel: account.role === "admin" ? "edit" as const : account.accessLevel, approvalStatus: account.approvalStatus, registrationMethod: account.registrationMethod, registrationRequestId, createdAt: account.createdAt.toISOString(), protected: account.id === currentUser.id || account.email.toLocaleLowerCase() === protectedEmail }));
-  return <Workspace initialPlots={plotRows.map(plotRowToFeature)} initialCategories={categoryRowsToRecord(categoryRows)} initialPlotStatuses={statusRows} initialUsers={initialUsers} initialSection={initialSection} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role, accessLevel: currentUser.accessLevel, locale: normalizeAppLocale(currentUser.locale) }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
+  const canViewExpenses = hasPermission(currentUser, "expenses.view");
+  return <Workspace initialPlots={plotRows.map(plotRowToFeature).map((feature) => plotForExpenseAccess(feature, canViewExpenses))} initialCategories={categoryRowsToRecord(categoryRows)} initialPlotStatuses={statusRows} initialUsers={initialUsers} initialSection={initialSection} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role, accessLevel: currentUser.accessLevel, locale: normalizeAppLocale(currentUser.locale) }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
 }

@@ -29,7 +29,7 @@ export function summarizePlots(plots: PlotFeature[], categories: Record<string, 
   };
 }
 
-export async function exportReportPdf(summary: ReportSummary, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = []) {
+export async function exportReportPdf(summary: ReportSummary, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = [], includeExpenses = true) {
   const locale = normalizeLocale(requestedLocale);
   const labels = reportLabels[locale];
   const [{ default: pdfMake }, { default: pdfFonts }] = await Promise.all([
@@ -51,7 +51,7 @@ export async function exportReportPdf(summary: ReportSummary, requestedLocale: s
       { table: { widths: ["*", 70, 90], body: [[labels.category, labels.count, labels.areaHa], ...summary.byCategory.map((item) => [item.name, item.count, formatArea(item.area, locale)])] }, layout: "lightHorizontalLines", margin: [0, 0, 0, 18] },
       { text: labels.plotList, style: "heading" },
       { table: { headerRows: 1, widths: [105, "*", 52, 85], body: [[labels.cadastralNumber, labels.nameOwner, labels.area, labels.category], ...summary.plots.map(({ properties }) => [properties.cadastralNumber, `${properties.name}\n${properties.owner}`, formatArea(properties.areaHa, locale), summary.byCategory.find(({ id }) => id === properties.category)?.name ?? properties.category])] }, layout: "lightHorizontalLines" },
-      ...(statuses.length ? pdfStageContent(summary, statuses, locale, labels) : []),
+      ...(statuses.length ? pdfStageContent(summary, statuses, locale, labels, includeExpenses) : []),
     ],
     styles: {
       brand: { bold: true, color: "#23754c", fontSize: 12, margin: [0, 0, 0, 6] },
@@ -63,13 +63,13 @@ export async function exportReportPdf(summary: ReportSummary, requestedLocale: s
   maker.createPdf(definition).download(`geopartners-report-${dateStamp()}.pdf`);
 }
 
-export async function exportReportDocx(summary: ReportSummary, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = []) {
+export async function exportReportDocx(summary: ReportSummary, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = [], includeExpenses = true) {
   const locale = normalizeLocale(requestedLocale);
   const labels = reportLabels[locale];
   const { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } = await import("docx");
   const tableWidth = 9020;
   const plotColumnWidths = [2700, 2700, 1200, 2420] as const;
-  const stageColumnWidths = [5000, 2400, 1620] as const;
+  const stageColumnWidths = includeExpenses ? [5000, 2400, 1620] : [5900, 3120];
   const tableRows = [
     new TableRow({ children: [cell(labels.cadastralNumber, true, plotColumnWidths[0]), cell(labels.nameOwner, true, plotColumnWidths[1]), cell(labels.areaHa, true, plotColumnWidths[2]), cell(labels.category, true, plotColumnWidths[3])] }),
     ...summary.plots.map(({ properties }) => new TableRow({ children: [
@@ -92,10 +92,10 @@ export async function exportReportDocx(summary: ReportSummary, requestedLocale: 
         return [
           new Paragraph({ text: `${properties.cadastralNumber} · ${properties.name}`, heading: HeadingLevel.HEADING_3 }),
           new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: stageColumnWidths, layout: TableLayoutType.AUTOFIT, rows: [
-            new TableRow({ children: [cell(labels.stage, true, stageColumnWidths[0]), cell(labels.completionDate, true, stageColumnWidths[1]), cell(labels.expenses, true, stageColumnWidths[2])] }),
+            new TableRow({ children: [cell(labels.stage, true, stageColumnWidths[0]), cell(labels.completionDate, true, stageColumnWidths[1]), ...(includeExpenses ? [cell(labels.expenses, true, stageColumnWidths[2])] : [])] }),
             ...statuses.map((status) => {
               const entry = progress.get(status.id);
-              return new TableRow({ children: [cell(status.name, false, stageColumnWidths[0]), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, false, stageColumnWidths[1]), cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale), false, stageColumnWidths[2])] });
+              return new TableRow({ children: [cell(status.name, false, stageColumnWidths[0]), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, false, stageColumnWidths[1]), ...(includeExpenses ? [cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale), false, stageColumnWidths[2])] : [])] });
             }),
           ] }),
         ];
@@ -115,29 +115,29 @@ export async function exportReportDocx(summary: ReportSummary, requestedLocale: 
   }
 }
 
-export async function exportResultReportPdf(groups: ResultReportGroup[], type: PlotResultType, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = []) {
+export async function exportResultReportPdf(groups: ResultReportGroup[], type: PlotResultType, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = [], includeExpenses = true) {
   const locale = normalizeLocale(requestedLocale); const labels = reportLabels[locale];
   const resultLabels = reportResultLabels[locale][type];
   const [{ default: pdfMake }, { default: pdfFonts }] = await Promise.all([import("pdfmake/build/pdfmake"), import("pdfmake/build/vfs_fonts")]);
   const maker = pdfMake as typeof pdfMake & { vfs: Record<string, string> }; maker.vfs = pdfFonts as unknown as Record<string, string>;
   const content: Content[] = [{ text: "GeoPartners", style: "brand" }, { text: resultLabels.title, style: "title" }, { text: `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`, color: "#66756d", margin: [0, 0, 0, 12] }];
-  for (const group of groups) content.push(...resultPdfBlock(group, statuses, locale, labels, resultLabels));
+  for (const group of groups) content.push(...resultPdfBlock(group, statuses, locale, labels, resultLabels, includeExpenses));
   const definition: TDocumentDefinitions = { info: { title: `GeoPartners - ${resultLabels.title}` }, defaultStyle: { font: "Roboto", fontSize: 9 }, content, styles: { brand: { bold: true, color: "#23754c", fontSize: 12, margin: [0, 0, 0, 6] }, title: { bold: true, fontSize: 18, margin: [0, 0, 0, 5] }, heading: { bold: true, fontSize: 12, margin: [0, 0, 0, 6] } }, footer: (page: number, pages: number) => ({ text: `${page} / ${pages}`, alignment: "center", color: "#778279", fontSize: 8 }) };
   maker.createPdf(definition).download(`geopartners-${type}-report-${dateStamp()}.pdf`);
 }
 
-export async function exportResultReportDocx(groups: ResultReportGroup[], type: PlotResultType, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = []) {
+export async function exportResultReportDocx(groups: ResultReportGroup[], type: PlotResultType, requestedLocale: string = defaultLocale, statuses: PlotStatusDefinition[] = [], includeExpenses = true) {
   const locale = normalizeLocale(requestedLocale); const labels = reportLabels[locale];
   const resultLabels = reportResultLabels[locale][type];
   const { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } = await import("docx");
-  const tableWidth = 9020; const infoWidths = [1900, 3560, 3560] as const; const stageWidths = [5000, 2400, 1620] as const;
+  const tableWidth = 9020; const infoWidths = [1900, 3560, 3560] as const; const stageWidths = includeExpenses ? [5000, 2400, 1620] : [5900, 3120];
   const cell = (text: string, bold = false, width?: number) => new TableCell({ width: width ? { size: width, type: WidthType.DXA } : undefined, children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
   const children: Array<import("docx").Paragraph | import("docx").Table> = [new Paragraph({ text: "GeoPartners", heading: HeadingLevel.HEADING_2 }), new Paragraph({ text: resultLabels.title, heading: HeadingLevel.TITLE }), new Paragraph({ text: `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}` })];
   for (const group of groups) {
     const primary = group.primary?.properties;
     children.push(new Paragraph({ text: `${resultLabels.number} ${group.number}`, heading: HeadingLevel.HEADING_2 }));
     children.push(new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: infoWidths, layout: TableLayoutType.AUTOFIT, rows: [new TableRow({ children: [cell(labels.relationship, true, infoWidths[0]), cell(labels.cadastralNumber, true, infoWidths[1]), cell(`${labels.owner} / ${labels.lessee}`, true, infoWidths[2])] }), new TableRow({ children: [cell(labels.mainCandidate, false, infoWidths[0]), cell(primary?.cadastralNumber ?? labels.notSpecified, false, infoWidths[1]), cell(primary ? `${primary.owner}\n${primary.lessee}` : labels.notSpecified, false, infoWidths[2])] }), ...group.alternativeCandidates.map(({ properties }) => new TableRow({ children: [cell(labels.alternativeCandidate, false, infoWidths[0]), cell(properties.cadastralNumber, false, infoWidths[1]), cell(`${properties.owner}\n${properties.lessee}`, false, infoWidths[2])] })), ...group.finalPlots.map(({ properties }) => new TableRow({ children: [cell(resultLabels.finalPlot, false, infoWidths[0]), cell(properties.cadastralNumber, false, infoWidths[1]), cell(`${properties.owner}\n${properties.lessee}`, false, infoWidths[2])] }))] }));
-    children.push(new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: stageWidths, layout: TableLayoutType.AUTOFIT, rows: [new TableRow({ children: [cell(labels.stage, true, stageWidths[0]), cell(labels.completionDate, true, stageWidths[1]), cell(labels.expenses, true, stageWidths[2])] }), ...statuses.map((status) => { const entry = group.progress.get(status.id); return new TableRow({ children: [cell(status.name, false, stageWidths[0]), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, false, stageWidths[1]), cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale), false, stageWidths[2])] }); })] }));
+    children.push(new Table({ width: { size: tableWidth, type: WidthType.DXA }, columnWidths: stageWidths, layout: TableLayoutType.AUTOFIT, rows: [new TableRow({ children: [cell(labels.stage, true, stageWidths[0]), cell(labels.completionDate, true, stageWidths[1]), ...(includeExpenses ? [cell(labels.expenses, true, stageWidths[2])] : [])] }), ...statuses.map((status) => { const entry = group.progress.get(status.id); return new TableRow({ children: [cell(status.name, false, stageWidths[0]), cell(entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, false, stageWidths[1]), ...(includeExpenses ? [cell(entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale), false, stageWidths[2])] : [])] }); })] }));
   }
   const doc = new Document({ sections: [{ properties: {}, children }] }); const blob = await Packer.toBlob(doc); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `geopartners-${type}-report-${dateStamp()}.docx`; anchor.click(); URL.revokeObjectURL(url);
 }
@@ -154,18 +154,18 @@ function formatCurrency(value: number, locale: AppLocale) { return value.toLocal
 function formatDate(value: string, locale: AppLocale) { return new Date(value).toLocaleString(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }); }
 function dateStamp() { return new Date().toISOString().slice(0, 10); }
 
-function pdfStageContent(summary: ReportSummary, statuses: PlotStatusDefinition[], locale: AppLocale, labels: (typeof reportLabels)[AppLocale]): Content[] {
+function pdfStageContent(summary: ReportSummary, statuses: PlotStatusDefinition[], locale: AppLocale, labels: (typeof reportLabels)[AppLocale], includeExpenses: boolean): Content[] {
   return [
     { text: labels.stageProgress, style: "heading", margin: [0, 18, 0, 8] },
     ...summary.plots.flatMap(({ properties }) => {
       const progress = new Map((properties.statusProgress ?? []).map((entry) => [entry.statusId, entry]));
       return [
         { text: `${properties.cadastralNumber} · ${properties.name}`, bold: true, margin: [0, 8, 0, 4] } as Content,
-        { table: { headerRows: 1, widths: ["*", 105, 80], body: [
-          [labels.stage, labels.completionDate, labels.expenses],
+        { table: { headerRows: 1, widths: includeExpenses ? ["*", 105, 80] : ["*", 125], body: [
+          [labels.stage, labels.completionDate, ...(includeExpenses ? [labels.expenses] : [])],
           ...statuses.map((status) => {
             const entry = progress.get(status.id);
-            return [status.name, entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale)];
+            return [status.name, entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, ...(includeExpenses ? [entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale)] : [])];
           }),
         ] }, layout: "lightHorizontalLines", fontSize: 8 } as Content,
       ];
@@ -173,10 +173,10 @@ function pdfStageContent(summary: ReportSummary, statuses: PlotStatusDefinition[
   ];
 }
 
-function resultPdfBlock(group: ResultReportGroup, statuses: PlotStatusDefinition[], locale: AppLocale, labels: (typeof reportLabels)[AppLocale], resultLabels: { title: string; number: string; finalPlot: string }): Content[] {
+function resultPdfBlock(group: ResultReportGroup, statuses: PlotStatusDefinition[], locale: AppLocale, labels: (typeof reportLabels)[AppLocale], resultLabels: { title: string; number: string; finalPlot: string }, includeExpenses: boolean): Content[] {
   const primary = group.primary?.properties;
   const rows = [[labels.relationship, labels.cadastralNumber, `${labels.owner} / ${labels.lessee}`], [labels.mainCandidate, primary?.cadastralNumber ?? labels.notSpecified, primary ? `${primary.owner}\n${primary.lessee}` : labels.notSpecified], ...group.alternativeCandidates.map(({ properties }) => [labels.alternativeCandidate, properties.cadastralNumber, `${properties.owner}\n${properties.lessee}`]), ...group.finalPlots.map(({ properties }) => [resultLabels.finalPlot, properties.cadastralNumber, `${properties.owner}\n${properties.lessee}`])];
-  return [{ text: `${resultLabels.number} ${group.number}`, style: "heading", margin: [0, 12, 0, 5] }, { table: { headerRows: 1, widths: [90, 120, "*"], body: rows }, layout: "lightHorizontalLines" }, { table: { headerRows: 1, widths: ["*", 105, 80], body: [[labels.stage, labels.completionDate, labels.expenses], ...statuses.map((status) => { const entry = group.progress.get(status.id); return [status.name, entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale)]; })] }, layout: "lightHorizontalLines", fontSize: 8, margin: [0, 7, 0, 0] }];
+  return [{ text: `${resultLabels.number} ${group.number}`, style: "heading", margin: [0, 12, 0, 5] }, { table: { headerRows: 1, widths: [90, 120, "*"], body: rows }, layout: "lightHorizontalLines" }, { table: { headerRows: 1, widths: includeExpenses ? ["*", 105, 80] : ["*", 125], body: [[labels.stage, labels.completionDate, ...(includeExpenses ? [labels.expenses] : [])], ...statuses.map((status) => { const entry = group.progress.get(status.id); return [status.name, entry ? formatDate(entry.completedAt, locale) : labels.notCompleted, ...(includeExpenses ? [entry?.cost === null || entry?.cost === undefined ? labels.notSpecified : formatCurrency(entry.cost, locale)] : [])]; })] }, layout: "lightHorizontalLines", fontSize: 8, margin: [0, 7, 0, 0] }];
 }
 
 function normalizeLocale(locale: string): AppLocale {

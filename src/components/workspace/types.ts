@@ -52,6 +52,8 @@ export type WorkspaceViewProps = {
   workspace: DataWorkspace;
   testWorkspaceEnabled: boolean;
   canEditPlots: boolean;
+  canViewExpenses: boolean;
+  canManageExpenses: boolean;
   managedUsers: ManagedUser[];
   actions: WorkspaceActions;
 };

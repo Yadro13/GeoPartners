@@ -17,13 +17,14 @@ const reportViews: ReportView[] = ["wtg", "road", "servitude", "substation", "pl
 const viewLabelKeys = { wtg: "viewWtg", road: "viewRoad", servitude: "viewServitude", substation: "viewSubstation", plots: "viewPlots" } as const;
 const titleKeys = { wtg: "wtgTitle", road: "roadTitle", servitude: "servitudeTitle", substation: "substationTitle" } as const;
 const descriptionKeys = { wtg: "wtgDescription", road: "roadDescription", servitude: "servitudeDescription", substation: "substationDescription" } as const;
+const restrictedDescriptionKeys = { wtg: "wtgDescriptionRestricted", road: "roadDescriptionRestricted", servitude: "servitudeDescriptionRestricted", substation: "substationDescriptionRestricted" } as const;
 const countKeys = { wtg: "wtgResultCount", road: "roadResultCount", servitude: "servitudeResultCount", substation: "substationResultCount" } as const;
 const numberKeys = { wtg: "wtgNumber", road: "roadNumber", servitude: "servitudeNumber", substation: "substationNumber" } as const;
 const finalPlotKeys = { wtg: "finalWtgPlot", road: "finalRoadPlot", servitude: "finalServitudePlot", substation: "finalSubstationPlot" } as const;
 const groupCountKeys = { wtg: "wtgCount", road: "roadCount", servitude: "servitudeCount", substation: "substationCount" } as const;
 const completedByKeys = { wtg: "stageCompletedByWtg", road: "stageCompletedByRoad", servitude: "stageCompletedByServitude", substation: "stageCompletedBySubstation" } as const;
 
-export function StatusReport({ plots, categories, statuses, view, onViewChange }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; view: ReportView; onViewChange: (view: ReportView) => void }) {
+export function StatusReport({ plots, categories, statuses, view, onViewChange, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; view: ReportView; onViewChange: (view: ReportView) => void; canViewExpenses: boolean }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const locale = useLocale();
@@ -36,6 +37,8 @@ export function StatusReport({ plots, categories, statuses, view, onViewChange }
   const [mode, setMode] = useState<MatrixMode>("progress");
   const [mobileStatusIndex, setMobileStatusIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const modes: MatrixMode[] = canViewExpenses ? ["progress", "dates", "expenses"] : ["progress", "dates"];
+  const visibleMode = canViewExpenses || mode !== "expenses" ? mode : "progress";
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const rows = useMemo(() => allRows.filter(({ plot }) => {
     const properties = plot.properties;
@@ -56,7 +59,7 @@ export function StatusReport({ plots, categories, statuses, view, onViewChange }
 
   const runExport = async () => {
     setExporting(true);
-    try { if (resultType) await exportResultReportXlsx(resultGroups, resultType, shownStatuses, locale, categories); else await exportStatusReportXlsx(rows, shownStatuses, locale); } finally { setExporting(false); }
+    try { if (resultType) await exportResultReportXlsx(resultGroups, resultType, shownStatuses, locale, categories, canViewExpenses); else await exportStatusReportXlsx(rows, shownStatuses, locale, canViewExpenses); } finally { setExporting(false); }
   };
 
   const itemCount = resultType ? resultGroups.length : rows.length;
@@ -64,27 +67,27 @@ export function StatusReport({ plots, categories, statuses, view, onViewChange }
   const totalCost = (resultType ? resultGroups : rows).reduce((sum, row) => sum + row.totalCost, 0);
 
   return <section className="status-report" aria-labelledby="status-report-title">
-    <div className="status-report__heading"><div><span className="eyebrow">{t("progressEyebrow")}</span><h2 id="status-report-title">{resultType ? t(titleKeys[resultType]) : t("progressTitle")}</h2><p>{resultType ? t(descriptionKeys[resultType]) : t("progressDescription")}</p></div><button className="command-button command-button--primary" disabled={exporting || !itemCount} type="button" onClick={runExport}><Download size={17} />{exporting ? t("exporting") : t("downloadExcel")}</button></div>
+    <div className="status-report__heading"><div><span className="eyebrow">{t("progressEyebrow")}</span><h2 id="status-report-title">{resultType ? t(titleKeys[resultType]) : t("progressTitle")}</h2><p>{resultType ? t(canViewExpenses ? descriptionKeys[resultType] : restrictedDescriptionKeys[resultType]) : t(canViewExpenses ? "progressDescription" : "progressDescriptionRestricted")}</p></div><button className="command-button command-button--primary" disabled={exporting || !itemCount} type="button" onClick={runExport}><Download size={17} />{exporting ? t("exporting") : t("downloadExcel")}</button></div>
     <div className="status-report__view"><span>{t("reportView")}</span><div className="segmented-control" role="group" aria-label={t("reportView")}>{reportViews.map((value) => <button aria-pressed={view === value} data-active={view === value} key={value} type="button" onClick={() => onViewChange(value)}>{t(viewLabelKeys[value])}</button>)}</div></div>
     <div className="status-report__filters">
       <label className="status-report__search"><span>{t("searchPlots")}</span><div><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></div></label>
       <label><span>{t("category")}</span><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="all">{t("allCategories")}</option>{Object.entries(categories).filter(([, category]) => category.visible !== false).map(([id, category]) => <option key={id} value={id}>{category.name}</option>)}</select></label>
       <label className="status-report__desktop-filter"><span>{t("stages")}</span><select value={statusId} onChange={(event) => setStatusId(event.target.value)}><option value="all">{t("allStages")}</option>{statuses.map((status, index) => <option key={status.id} value={status.id}>{index + 1}. {status.name}</option>)}</select></label>
-      <fieldset className="status-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{(["progress", "dates", "expenses"] as const).map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => setMode(value)}>{t(value)}</button>)}</div></fieldset>
+      <fieldset className="status-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{modes.map((value) => <button aria-pressed={visibleMode === value} data-active={visibleMode === value} key={value} type="button" onClick={() => setMode(value)}>{t(value)}</button>)}</div></fieldset>
     </div>
-    <div className="status-report__result"><strong>{resultType ? t(countKeys[resultType], { count: itemCount }) : t("resultCount", { count: itemCount })}</strong><span>{t("completedCount", { count: completedCount })}</span><span>{format.number(totalCost, { style: "currency", currency: "UAH" })}</span></div>
+    <div className="status-report__result"><strong>{resultType ? t(countKeys[resultType], { count: itemCount }) : t("resultCount", { count: itemCount })}</strong><span>{t("completedCount", { count: completedCount })}</span>{canViewExpenses ? <span>{format.number(totalCost, { style: "currency", currency: "UAH" })}</span> : null}</div>
     {itemCount && shownStatuses.length ? <>
-      {resultType ? <DesktopResultMatrix groups={resultGroups} statuses={shownStatuses} mode={mode} type={resultType} /> : <DesktopMatrix rows={rows} statuses={shownStatuses} mode={mode} />}
-      {activeStatus ? resultType ? <MobileResultStageReport groups={resultGroups} statuses={statuses} activeIndex={activeStatusIndex} mode={mode} type={resultType} onChange={setMobileStatusIndex} onModeChange={setMode} /> : <MobileStageReport rows={rows} statuses={statuses} activeIndex={activeStatusIndex} mode={mode} onChange={setMobileStatusIndex} onModeChange={setMode} /> : null}
+      {resultType ? <DesktopResultMatrix groups={resultGroups} statuses={shownStatuses} mode={visibleMode} type={resultType} canViewExpenses={canViewExpenses} /> : <DesktopMatrix rows={rows} statuses={shownStatuses} mode={visibleMode} canViewExpenses={canViewExpenses} />}
+      {activeStatus ? resultType ? <MobileResultStageReport groups={resultGroups} statuses={statuses} activeIndex={activeStatusIndex} mode={visibleMode} modes={modes} type={resultType} onChange={setMobileStatusIndex} onModeChange={setMode} /> : <MobileStageReport rows={rows} statuses={statuses} activeIndex={activeStatusIndex} mode={visibleMode} modes={modes} onChange={setMobileStatusIndex} onModeChange={setMode} /> : null}
     </> : <div className="status-report__empty">{t("noData")}</div>}
   </section>;
 }
 
-function DesktopResultMatrix({ groups, statuses, mode, type }: { groups: ResultReportGroup[]; statuses: PlotStatusDefinition[]; mode: MatrixMode; type: PlotResultType }) {
+function DesktopResultMatrix({ groups, statuses, mode, type, canViewExpenses }: { groups: ResultReportGroup[]; statuses: PlotStatusDefinition[]; mode: MatrixMode; type: PlotResultType; canViewExpenses: boolean }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const locale = useLocale();
-  return <div className="report-matrix-wrap"><table className="report-matrix report-matrix--result report-matrix--wtg" data-result-type={type} lang={locale}><colgroup><col className="report-matrix__wtg-number-col" /><col className="report-matrix__main-col" /><col className="report-matrix__alternatives-col" /><col className="report-matrix__final-col" /><col className="report-matrix__total-col" />{statuses.map((status) => <col className="report-matrix__stage-col" key={status.id} />)}</colgroup><thead><tr><th>{t(numberKeys[type])}</th><th>{t("mainCandidate")}</th><th>{t("alternativeCandidates")}</th><th>{t(finalPlotKeys[type])}</th><th className="report-matrix__cost">{t("totalExpenses")}</th>{statuses.map((status, index) => <th className="report-matrix__stage" key={status.id} title={status.name}><span>{index + 1}</span>{status.name}</th>)}</tr></thead><tbody>{groups.map((group) => <tr key={group.key}><th scope="row"><strong>{group.number}</strong></th><td><PlotReferences plots={group.mainCandidates} /></td><td><PlotReferences plots={group.alternativeCandidates} /></td><td><PlotReferences plots={group.finalPlots} /></td><td className="report-matrix__cost">{format.number(group.totalCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td>{statuses.map((status) => <GroupStatusCell key={status.id} group={group} statusId={status.id} mode={mode} />)}</tr>)}</tbody><tfoot><tr><th>{t("totals")}</th><td>{t(groupCountKeys[type], { count: groups.length })}</td><td>{groups.reduce((sum, group) => sum + group.alternativeCandidates.length, 0)}</td><td>{groups.reduce((sum, group) => sum + group.finalPlots.length, 0)}</td><td className="report-matrix__cost">{format.number(groups.reduce((sum, group) => sum + group.totalCost, 0), { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td>{statuses.map((status) => <td key={status.id}>{groups.filter((group) => group.progress.has(status.id)).length}</td>)}</tr></tfoot></table></div>;
+  return <div className="report-matrix-wrap"><table className="report-matrix report-matrix--result report-matrix--wtg" data-result-type={type} lang={locale}><colgroup><col className="report-matrix__wtg-number-col" /><col className="report-matrix__main-col" /><col className="report-matrix__alternatives-col" /><col className="report-matrix__final-col" />{canViewExpenses ? <col className="report-matrix__total-col" /> : null}{statuses.map((status) => <col className="report-matrix__stage-col" key={status.id} />)}</colgroup><thead><tr><th>{t(numberKeys[type])}</th><th>{t("mainCandidate")}</th><th>{t("alternativeCandidates")}</th><th>{t(finalPlotKeys[type])}</th>{canViewExpenses ? <th className="report-matrix__cost">{t("totalExpenses")}</th> : null}{statuses.map((status, index) => <th className="report-matrix__stage" key={status.id} title={status.name}><span>{index + 1}</span>{status.name}</th>)}</tr></thead><tbody>{groups.map((group) => <tr key={group.key}><th scope="row"><strong>{group.number}</strong></th><td><PlotReferences plots={group.mainCandidates} /></td><td><PlotReferences plots={group.alternativeCandidates} /></td><td><PlotReferences plots={group.finalPlots} /></td>{canViewExpenses ? <td className="report-matrix__cost">{format.number(group.totalCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td> : null}{statuses.map((status) => <GroupStatusCell key={status.id} group={group} statusId={status.id} mode={mode} />)}</tr>)}</tbody><tfoot><tr><th>{t("totals")}</th><td>{t(groupCountKeys[type], { count: groups.length })}</td><td>{groups.reduce((sum, group) => sum + group.alternativeCandidates.length, 0)}</td><td>{groups.reduce((sum, group) => sum + group.finalPlots.length, 0)}</td>{canViewExpenses ? <td className="report-matrix__cost">{format.number(groups.reduce((sum, group) => sum + group.totalCost, 0), { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td> : null}{statuses.map((status) => <td key={status.id}>{groups.filter((group) => group.progress.has(status.id)).length}</td>)}</tr></tfoot></table></div>;
 }
 
 function PlotReferences({ plots }: { plots: PlotFeature[] }) {
@@ -103,11 +106,11 @@ function GroupStatusCell({ group, statusId, mode }: { group: ResultReportGroup; 
   return <td className="report-matrix__value" data-completed="true" title={mode === "expenses" ? fullCost : undefined}><span className="sr-only">{t("completed")}: </span>{value}</td>;
 }
 
-function DesktopMatrix({ rows, statuses, mode }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; mode: MatrixMode }) {
+function DesktopMatrix({ rows, statuses, mode, canViewExpenses }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; mode: MatrixMode; canViewExpenses: boolean }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const locale = useLocale();
-  return <div className="report-matrix-wrap"><table className="report-matrix" lang={locale}><thead><tr><th className="report-matrix__identity">{t("plot")}</th><th className="report-matrix__category">{t("category")}</th><th className="report-matrix__cost">{t("totalExpenses")}</th>{statuses.map((status, index) => <th className="report-matrix__stage" key={status.id} title={status.name}><span>{index + 1}</span>{status.name}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.plot.properties.id}><th className="report-matrix__identity" scope="row"><strong>{row.plot.properties.cadastralNumber}</strong><span>{row.plot.properties.name || row.plot.properties.owner}</span></th><td className="report-matrix__category"><span className="report-matrix__category-content"><span className="category-line__swatch" style={{ background: row.category.color }} /><span>{row.category.name}</span></span></td><td className="report-matrix__cost">{format.number(row.totalCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td>{statuses.map((status) => <StatusCell key={status.id} row={row} statusId={status.id} mode={mode} />)}</tr>)}</tbody><tfoot><tr><th className="report-matrix__identity">{t("totals")}</th><td className="report-matrix__category">{t("plotsCount", { count: rows.length })}</td><td className="report-matrix__cost">{format.number(rows.reduce((sum, row) => sum + row.totalCost, 0), { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td>{statuses.map((status) => <td key={status.id}>{rows.filter((row) => row.progress.has(status.id)).length}</td>)}</tr></tfoot></table></div>;
+  return <div className="report-matrix-wrap"><table className="report-matrix" lang={locale}><thead><tr><th className="report-matrix__identity">{t("plot")}</th><th className="report-matrix__category">{t("category")}</th>{canViewExpenses ? <th className="report-matrix__cost">{t("totalExpenses")}</th> : null}{statuses.map((status, index) => <th className="report-matrix__stage" key={status.id} title={status.name}><span>{index + 1}</span>{status.name}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.plot.properties.id}><th className="report-matrix__identity" scope="row"><strong>{row.plot.properties.cadastralNumber}</strong><span>{row.plot.properties.name || row.plot.properties.owner}</span></th><td className="report-matrix__category"><span className="report-matrix__category-content"><span className="category-line__swatch" style={{ background: row.category.color }} /><span>{row.category.name}</span></span></td>{canViewExpenses ? <td className="report-matrix__cost">{format.number(row.totalCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td> : null}{statuses.map((status) => <StatusCell key={status.id} row={row} statusId={status.id} mode={mode} />)}</tr>)}</tbody><tfoot><tr><th className="report-matrix__identity">{t("totals")}</th><td className="report-matrix__category">{t("plotsCount", { count: rows.length })}</td>{canViewExpenses ? <td className="report-matrix__cost">{format.number(rows.reduce((sum, row) => sum + row.totalCost, 0), { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</td> : null}{statuses.map((status) => <td key={status.id}>{rows.filter((row) => row.progress.has(status.id)).length}</td>)}</tr></tfoot></table></div>;
 }
 
 function StatusCell({ row, statusId, mode }: { row: StatusReportRow; statusId: string; mode: MatrixMode }) {
@@ -120,7 +123,7 @@ function StatusCell({ row, statusId, mode }: { row: StatusReportRow; statusId: s
   return <td className="report-matrix__value" data-completed="true" title={mode === "expenses" ? fullCost : undefined}><span className="sr-only">{t("completed")}: </span>{value}</td>;
 }
 
-function MobileStageReport({ rows, statuses, activeIndex, mode, onChange, onModeChange }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; activeIndex: number; mode: MatrixMode; onChange: (index: number) => void; onModeChange: (mode: MatrixMode) => void }) {
+function MobileStageReport({ rows, statuses, activeIndex, mode, modes, onChange, onModeChange }: { rows: StatusReportRow[]; statuses: PlotStatusDefinition[]; activeIndex: number; mode: MatrixMode; modes: MatrixMode[]; onChange: (index: number) => void; onModeChange: (mode: MatrixMode) => void }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const status = statuses[activeIndex];
@@ -144,7 +147,7 @@ function MobileStageReport({ rows, statuses, activeIndex, mode, onChange, onMode
   >
     <div className="mobile-stage-report__nav"><button className="icon-button" type="button" onClick={previous} aria-label={t("previousStage")}><ArrowLeft size={19} /></button><label><span>{t("stageOf", { current: activeIndex + 1, total: statuses.length })}</span><select value={activeIndex} onChange={(event) => onChange(Number(event.target.value))}>{statuses.map((item, index) => <option key={item.id} value={index}>{index + 1}. {item.name}</option>)}</select></label><button className="icon-button" type="button" onClick={next} aria-label={t("nextStage")}><ArrowRight size={19} /></button></div>
     <div className="mobile-stage-report__summary" aria-live="polite"><strong>{status.name}</strong><span>{t("stageCompletedBy", { completed: rows.filter((row) => row.progress.has(status.id)).length, total: rows.length })}</span></div>
-    <fieldset className="mobile-stage-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{(["progress", "dates", "expenses"] as const).map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => onModeChange(value)}>{t(value)}</button>)}</div></fieldset>
+    <fieldset className="mobile-stage-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{modes.map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => onModeChange(value)}>{t(value)}</button>)}</div></fieldset>
     <div className="mobile-stage-report__list-header"><span>{t("plot")}</span><strong>{t("stageNumber", { number: activeIndex + 1 })}</strong></div>
     <div className="mobile-stage-report__list">{rows.map((row) => {
       const entry = row.progress.get(status.id);
@@ -159,7 +162,7 @@ function MobileStageReport({ rows, statuses, activeIndex, mode, onChange, onMode
   </div>;
 }
 
-function MobileResultStageReport({ groups, statuses, activeIndex, mode, type, onChange, onModeChange }: { groups: ResultReportGroup[]; statuses: PlotStatusDefinition[]; activeIndex: number; mode: MatrixMode; type: PlotResultType; onChange: (index: number) => void; onModeChange: (mode: MatrixMode) => void }) {
+function MobileResultStageReport({ groups, statuses, activeIndex, mode, modes, type, onChange, onModeChange }: { groups: ResultReportGroup[]; statuses: PlotStatusDefinition[]; activeIndex: number; mode: MatrixMode; modes: MatrixMode[]; type: PlotResultType; onChange: (index: number) => void; onModeChange: (mode: MatrixMode) => void }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const status = statuses[activeIndex];
@@ -177,7 +180,7 @@ function MobileResultStageReport({ groups, statuses, activeIndex, mode, type, on
   return <div className="mobile-stage-report" onPointerDown={(event) => { if (event.pointerType === "touch") swipeStart.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={(event) => { if (event.pointerType === "touch") finishSwipe(event.clientX, event.clientY); }} onPointerCancel={() => { swipeStart.current = null; }}>
     <div className="mobile-stage-report__nav"><button className="icon-button" type="button" onClick={previous} aria-label={t("previousStage")}><ArrowLeft size={19} /></button><label><span>{t("stageOf", { current: activeIndex + 1, total: statuses.length })}</span><select value={activeIndex} onChange={(event) => onChange(Number(event.target.value))}>{statuses.map((item, index) => <option key={item.id} value={index}>{index + 1}. {item.name}</option>)}</select></label><button className="icon-button" type="button" onClick={next} aria-label={t("nextStage")}><ArrowRight size={19} /></button></div>
     <div className="mobile-stage-report__summary" aria-live="polite"><strong>{status.name}</strong><span>{t(completedByKeys[type], { completed: groups.filter((group) => group.progress.has(status.id)).length, total: groups.length })}</span></div>
-    <fieldset className="mobile-stage-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{(["progress", "dates", "expenses"] as const).map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => onModeChange(value)}>{t(value)}</button>)}</div></fieldset>
+    <fieldset className="mobile-stage-report__mode"><legend>{t("cellContent")}</legend><div className="segmented-control">{modes.map((value) => <button aria-pressed={mode === value} data-active={mode === value} key={value} type="button" onClick={() => onModeChange(value)}>{t(value)}</button>)}</div></fieldset>
     <div className="mobile-stage-report__list-header"><span>{t(numberKeys[type])}</span><strong>{t("stageNumber", { number: activeIndex + 1 })}</strong></div>
     <div className="mobile-stage-report__list">{groups.map((group) => {
       const entry = group.progress.get(status.id);

@@ -48,7 +48,7 @@ function CategorySetting({ id, category, actions, canManage }: { id: string; cat
   </div>;
 }
 
-export function ReportsPanel({ plots, categories, plotStatuses, actions }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; plotStatuses: PlotStatusDefinition[]; actions: WorkspaceActions }) {
+export function ReportsPanel({ plots, categories, plotStatuses, actions, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; plotStatuses: PlotStatusDefinition[]; actions: WorkspaceActions; canViewExpenses: boolean }) {
   const t = useTranslations("panels");
   const format = useFormatter();
   const locale = useLocale();
@@ -62,14 +62,14 @@ export function ReportsPanel({ plots, categories, plotStatuses, actions }: { plo
   const run = async (type: "xlsx" | "pdf" | "docx") => {
     setBusy(type);
     try {
-      if (type === "xlsx") { if (resultType) await exportResultReportXlsx(resultGroups, resultType, plotStatuses, locale, categories); else await exportStatusReportXlsx(statusRows, plotStatuses, locale); }
-      else if (type === "pdf") { if (resultType) await exportResultReportPdf(resultGroups, resultType, locale, plotStatuses); else await exportReportPdf(summary, locale, plotStatuses); }
-      else { if (resultType) await exportResultReportDocx(resultGroups, resultType, locale, plotStatuses); else await exportReportDocx(summary, locale, plotStatuses); }
+      if (type === "xlsx") { if (resultType) await exportResultReportXlsx(resultGroups, resultType, plotStatuses, locale, categories, canViewExpenses); else await exportStatusReportXlsx(statusRows, plotStatuses, locale, canViewExpenses); }
+      else if (type === "pdf") { if (resultType) await exportResultReportPdf(resultGroups, resultType, locale, plotStatuses, canViewExpenses); else await exportReportPdf(summary, locale, plotStatuses, canViewExpenses); }
+      else { if (resultType) await exportResultReportDocx(resultGroups, resultType, locale, plotStatuses, canViewExpenses); else await exportReportDocx(summary, locale, plotStatuses, canViewExpenses); }
     } finally { setBusy(null); }
   };
   return <section className="workspace-page report-page"><header className="workspace-page__header"><div><span className="eyebrow">{t("currentSet")}</span><h1>{t("summaryReport")}</h1></div><div className="page-actions"><button className="command-button" type="button" onClick={actions.exportCsv}><FileSpreadsheet size={17} />CSV</button><button className="command-button" type="button" onClick={actions.exportGeoJson}><FileJson size={17} />GeoJSON</button></div></header>
-    <div className="report-metrics"><article><strong>{format.number(summary.count)}</strong><span>{t("visiblePlots")}</span></article><article><strong>{format.number(summary.totalArea, { maximumFractionDigits: 4 })}</strong><span>{t("totalHectares")}</span></article><article><strong>{format.number(summary.byCategory.length)}</strong><span>{t("activeCategories")}</span></article><article><strong>{format.number(summary.totalStageCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</strong><span><Coins size={14} />{t("totalStageExpenses")}</span></article></div>
-    <StatusReport plots={plots} categories={categories} statuses={plotStatuses} view={reportView} onViewChange={setReportView} />
+    <div className="report-metrics"><article><strong>{format.number(summary.count)}</strong><span>{t("visiblePlots")}</span></article><article><strong>{format.number(summary.totalArea, { maximumFractionDigits: 4 })}</strong><span>{t("totalHectares")}</span></article><article><strong>{format.number(summary.byCategory.length)}</strong><span>{t("activeCategories")}</span></article>{canViewExpenses ? <article><strong>{format.number(summary.totalStageCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</strong><span><Coins size={14} />{t("totalStageExpenses")}</span></article> : null}</div>
+    <StatusReport plots={plots} categories={categories} statuses={plotStatuses} view={reportView} onViewChange={setReportView} canViewExpenses={canViewExpenses} />
     <div className="report-layout"><section><h2>{t("byCategory")}</h2><div className="report-category-list">{summary.byCategory.map((item) => <div key={item.id}><span className="category-line__swatch" style={{ background: item.color }} /><strong>{item.name}</strong><span>{t("pieces", { count: item.count })}</span><span>{t("hectares", { area: format.number(item.area, { maximumFractionDigits: 4 }) })}</span></div>)}</div></section>
       <aside className="report-export"><h2>{t("saveReport")}</h2><p>{t("reportNote")}</p><button className="command-button command-button--primary" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("xlsx")}><FileSpreadsheet size={17} />{busy === "xlsx" ? t("generating") : t("downloadXlsx")}</button><button className="command-button" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("pdf")}><Download size={17} />{busy === "pdf" ? t("generating") : t("downloadPdf")}</button><button className="command-button" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("docx")}><FileText size={17} />{busy === "docx" ? t("generating") : t("downloadDocx")}</button><button className="command-button" disabled={!hasReportData} type="button" onClick={printReport}><Printer size={17} />{t("print")}</button></aside>
     </div>

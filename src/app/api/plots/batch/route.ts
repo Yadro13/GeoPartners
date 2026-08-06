@@ -9,6 +9,7 @@ import { getDataWorkspace } from "@/lib/data-workspace";
 import { hasPermission } from "@/lib/permissions";
 import { featureToPlotValues, parsePlotFeature, plotRowToFeature } from "@/lib/plots";
 import { resolvePlotStatusProgress } from "@/lib/plot-status-directory";
+import { plotForExpenseAccess, preservePlotExpenses } from "@/lib/plot-expenses";
 
 export async function PATCH(request: Request) {
   const currentUser = await getCurrentUser();
@@ -32,6 +33,10 @@ export async function PATCH(request: Request) {
 
     for (const feature of features) {
       const current = currentById.get(feature.properties.id)!;
+      if (!hasPermission(currentUser, "expenses.manage")) {
+        const preserved = preservePlotExpenses(feature, plotRowToFeature(current));
+        feature.properties.statusProgress = preserved.properties.statusProgress;
+      }
       const statusState = await resolvePlotStatusProgress(workspace, feature.properties.statusProgress ?? [], feature.properties.status ?? "", current.updatedAt);
       feature.properties.statusProgress = statusState.progress;
       feature.properties.status = statusState.currentStatus;
@@ -50,7 +55,8 @@ export async function PATCH(request: Request) {
       }
     });
 
-    return NextResponse.json(features);
+    const canViewExpenses = hasPermission(currentUser, "expenses.view");
+    return NextResponse.json(features.map((feature) => plotForExpenseAccess(feature, canViewExpenses)));
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Некоректні дані." }, { status: 400 });
   }

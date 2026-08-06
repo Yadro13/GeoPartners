@@ -66,6 +66,12 @@ assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "plots.delete
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "statuses.manage"), true);
 assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "snapshots.capture"), false);
 assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "snapshots.capture"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "snapshots.view"), false);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "snapshots.view"), true);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "expenses.view"), false);
+assert.equal(hasPermission({ role: "user", accessLevel: "edit" }, "expenses.manage"), false);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "expenses.view"), true);
+assert.equal(hasPermission({ role: "admin", accessLevel: "read" }, "expenses.manage"), true);
 assert(currentBackupTables.includes("workspace_snapshot"), "new backups require workspace_snapshot");
 assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
   "обрана ділянка як варіант",

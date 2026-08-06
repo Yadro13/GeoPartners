@@ -7,6 +7,8 @@ import { parseVersionSnapshot } from "@/lib/audit";
 import { findPlotConflicts, validatePolygonGeometry } from "@/lib/geometry";
 import { parsePlotFeature, plotRowToFeature } from "@/lib/plots";
 import { getDataWorkspace } from "@/lib/data-workspace";
+import { hasPermission } from "@/lib/permissions";
+import { plotForExpenseAccess } from "@/lib/plot-expenses";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const currentUser = await getCurrentUser();
@@ -25,7 +27,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ...validation.issues.filter(({ level }) => level === "error").map(({ message }) => message),
       ...(duplicate ? ["Кадастровий номер уже використовується іншою ділянкою."] : []),
     ];
-    return NextResponse.json({ auditId: id, action: record.entry.action, current, target, validationIssues: validation.issues, conflicts, blockingMessages }, { headers: { "cache-control": "no-store" } });
+    const canViewExpenses = hasPermission(currentUser, "expenses.view");
+    return NextResponse.json({ auditId: id, action: record.entry.action, current: current ? plotForExpenseAccess(current, canViewExpenses) : null, target: plotForExpenseAccess(target, canViewExpenses), validationIssues: validation.issues, conflicts, blockingMessages }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Не вдалося підготувати порівняння." }, { status: 400 });
   }

@@ -29,7 +29,7 @@ export function buildStatusReportRows(plots: PlotFeature[], categories: Record<s
     });
 }
 
-export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale) {
+export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, includeExpenses = true) {
   const locale = isAppLocale(requestedLocale) ? requestedLocale : defaultLocale;
   const labels = xlsxLabels[locale];
   const { Workbook } = await import("exceljs");
@@ -39,8 +39,8 @@ export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: 
   workbook.modified = new Date();
   workbook.subject = labels.title;
 
-  createMatrixSheet(workbook, rows, statuses, locale, labels);
-  createDetailsSheet(workbook, rows, statuses, labels, locale);
+  createMatrixSheet(workbook, rows, statuses, locale, labels, includeExpenses);
+  createDetailsSheet(workbook, rows, statuses, labels, locale, includeExpenses);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -52,7 +52,7 @@ export async function exportStatusReportXlsx(rows: StatusReportRow[], statuses: 
   URL.revokeObjectURL(url);
 }
 
-export async function exportResultReportXlsx(groups: ResultReportGroup[], type: PlotResultType, statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, categories: Record<string, CategoryDefinition> = {}) {
+export async function exportResultReportXlsx(groups: ResultReportGroup[], type: PlotResultType, statuses: PlotStatusDefinition[], requestedLocale: string = defaultLocale, categories: Record<string, CategoryDefinition> = {}, includeExpenses = true) {
   const locale = isAppLocale(requestedLocale) ? requestedLocale : defaultLocale;
   const labels = xlsxLabels[locale];
   const resultLabels = xlsxResultLabels[locale][type];
@@ -60,20 +60,23 @@ export async function exportResultReportXlsx(groups: ResultReportGroup[], type: 
   const workbook = new Workbook();
   workbook.creator = "GeoPartners"; workbook.created = new Date(); workbook.modified = new Date(); workbook.subject = resultLabels.title;
   const dateFormat = xlsxDateFormat(locale);
-  const sheet = workbook.addWorksheet(resultLabels.sheet, { views: [{ state: "frozen", xSplit: 7, ySplit: 4, topLeftCell: "H5", activeCell: "H5" }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  sheet.mergeCells(1, 1, 1, 7 + statuses.length); sheet.getCell(1, 1).value = resultLabels.title; sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
-  sheet.mergeCells(2, 1, 2, 7 + statuses.length); sheet.getCell(2, 1).value = `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`;
-  sheet.getRow(4).values = [resultLabels.number, labels.mainCadastral, labels.owner, labels.lessee, labels.alternatives, resultLabels.finalPlot, labels.totalExpenses, ...statuses.map(({ name }) => name)];
+  const fixedColumns = includeExpenses ? 7 : 6;
+  const firstStageColumn = fixedColumns + 1;
+  const firstStageCell = `${columnLetter(firstStageColumn)}5`;
+  const sheet = workbook.addWorksheet(resultLabels.sheet, { views: [{ state: "frozen", xSplit: fixedColumns, ySplit: 4, topLeftCell: firstStageCell, activeCell: firstStageCell }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  sheet.mergeCells(1, 1, 1, fixedColumns + statuses.length); sheet.getCell(1, 1).value = resultLabels.title; sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
+  sheet.mergeCells(2, 1, 2, fixedColumns + statuses.length); sheet.getCell(2, 1).value = `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`;
+  sheet.getRow(4).values = [resultLabels.number, labels.mainCadastral, labels.owner, labels.lessee, labels.alternatives, resultLabels.finalPlot, ...(includeExpenses ? [labels.totalExpenses] : []), ...statuses.map(({ name }) => name)];
   sheet.getRow(4).height = 74; styleHeader(sheet.getRow(4));
-  sheet.columns = [{ width: 13 }, { width: 25 }, { width: 28 }, { width: 28 }, { width: 34 }, { width: 25 }, { width: 16 }, ...statuses.map(() => ({ width: 15 }))];
+  sheet.columns = [{ width: 13 }, { width: 25 }, { width: 28 }, { width: 28 }, { width: 34 }, { width: 25 }, ...(includeExpenses ? [{ width: 16 }] : []), ...statuses.map(() => ({ width: 15 }))];
   groups.forEach((group, index) => {
     const primary = group.primary?.properties;
-    const row = sheet.addRow([group.number, primary?.cadastralNumber ?? "", primary?.owner ?? "", primary?.lessee ?? "", group.alternativeCandidates.map(({ properties }) => `${properties.cadastralNumber}\n${properties.owner}\n${properties.lessee}`).join("\n\n"), group.finalPlots.map(({ properties }) => properties.cadastralNumber).join("\n"), group.totalCost, ...statuses.map(({ id }) => group.progress.has(id) ? new Date(group.progress.get(id)!.completedAt) : null)]);
-    row.alignment = { vertical: "top", wrapText: true }; row.getCell(7).numFmt = '#,##0.00 "UAH"'; row.height = Math.max(34, group.alternativeCandidates.length * 42);
-    statuses.forEach((_, statusIndex) => { const cell = row.getCell(8 + statusIndex); cell.numFmt = dateFormat.date; cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; if (cell.value) cell.fill = solidFill("FFE7F3EB"); });
+    const row = sheet.addRow([group.number, primary?.cadastralNumber ?? "", primary?.owner ?? "", primary?.lessee ?? "", group.alternativeCandidates.map(({ properties }) => `${properties.cadastralNumber}\n${properties.owner}\n${properties.lessee}`).join("\n\n"), group.finalPlots.map(({ properties }) => properties.cadastralNumber).join("\n"), ...(includeExpenses ? [group.totalCost] : []), ...statuses.map(({ id }) => group.progress.has(id) ? new Date(group.progress.get(id)!.completedAt) : null)]);
+    row.alignment = { vertical: "top", wrapText: true }; if (includeExpenses) row.getCell(7).numFmt = '#,##0.00 "UAH"'; row.height = Math.max(34, group.alternativeCandidates.length * 42);
+    statuses.forEach((_, statusIndex) => { const cell = row.getCell(firstStageColumn + statusIndex); cell.numFmt = dateFormat.date; cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; if (cell.value) cell.fill = solidFill("FFE7F3EB"); });
     if (index % 2 === 1) row.eachCell((cell) => { if (!cell.fill || (cell.fill as { type?: string }).type !== "pattern") cell.fill = solidFill("FFF8FAF9"); });
   });
-  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + groups.length, column: 7 + statuses.length } };
+  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + groups.length, column: fixedColumns + statuses.length } };
   sheet.eachRow((row, rowNumber) => row.eachCell({ includeEmpty: true }, (cell) => { if (rowNumber >= 4) cell.border = thinBorder(); }));
 
   const candidates = workbook.addWorksheet(resultLabels.candidatesSheet, { views: [{ state: "frozen", ySplit: 1 }] });
@@ -90,27 +93,30 @@ export async function exportResultReportXlsx(groups: ResultReportGroup[], type: 
 type Workbook = InstanceType<(typeof import("exceljs"))["Workbook"]>;
 type Labels = (typeof xlsxLabels)[AppLocale];
 
-function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], locale: AppLocale, labels: Labels) {
+function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], locale: AppLocale, labels: Labels, includeExpenses: boolean) {
   const dateFormat = xlsxDateFormat(locale);
+  const fixedColumns = includeExpenses ? 5 : 4;
+  const firstStageColumn = fixedColumns + 1;
+  const firstStageCell = `${columnLetter(firstStageColumn)}5`;
   const sheet = workbook.addWorksheet(labels.matrixSheet, {
-    views: [{ state: "frozen", xSplit: 5, ySplit: 4, topLeftCell: "F5", activeCell: "F5" }],
+    views: [{ state: "frozen", xSplit: fixedColumns, ySplit: 4, topLeftCell: firstStageCell, activeCell: firstStageCell }],
     pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     headerFooter: { oddFooter: `&LGeoPartners&C${labels.matrixSheet}&R${labels.page} &P / &N` },
   });
   sheet.properties.defaultRowHeight = 22;
-  sheet.mergeCells(1, 1, 1, 5 + statuses.length);
+  sheet.mergeCells(1, 1, 1, fixedColumns + statuses.length);
   sheet.getCell(1, 1).value = labels.title;
   sheet.getCell(1, 1).font = { bold: true, size: 16, color: { argb: "FF173126" } };
   sheet.getCell(2, 1).value = `${labels.generated}: ${new Date().toLocaleString(intlLocale(locale))}`;
   sheet.getCell(2, 1).font = { size: 10, color: { argb: "FF66756D" } };
-  sheet.mergeCells(2, 1, 2, 5 + statuses.length);
+  sheet.mergeCells(2, 1, 2, fixedColumns + statuses.length);
 
-  const headers = [labels.number, labels.plot, labels.cadastralNumber, labels.category, labels.totalExpenses, ...statuses.map(({ name }) => name)];
+  const headers = [labels.number, labels.plot, labels.cadastralNumber, labels.category, ...(includeExpenses ? [labels.totalExpenses] : []), ...statuses.map(({ name }) => name)];
   sheet.getRow(4).values = headers;
   sheet.getRow(4).height = 74;
   styleHeader(sheet.getRow(4));
   sheet.columns = [
-    { width: 7 }, { width: 28 }, { width: 25 }, { width: 22 }, { width: 16 },
+    { width: 7 }, { width: 28 }, { width: 25 }, { width: 22 }, ...(includeExpenses ? [{ width: 16 }] : []),
     ...statuses.map(() => ({ width: 15 })),
   ];
 
@@ -121,7 +127,7 @@ function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses
       properties.name || properties.owner || properties.cadastralNumber,
       properties.cadastralNumber,
       item.category.name,
-      item.totalCost,
+      ...(includeExpenses ? [item.totalCost] : []),
       ...statuses.map(({ id }) => {
         const entry = item.progress.get(id);
         return entry ? new Date(entry.completedAt) : null;
@@ -129,9 +135,9 @@ function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses
     ]);
     row.height = 34;
     row.alignment = { vertical: "middle", wrapText: true };
-    row.getCell(5).numFmt = '#,##0.00 "UAH"';
+    if (includeExpenses) row.getCell(5).numFmt = '#,##0.00 "UAH"';
     statuses.forEach((_, statusIndex) => {
-      const cell = row.getCell(6 + statusIndex);
+      const cell = row.getCell(firstStageColumn + statusIndex);
       cell.numFmt = dateFormat.date;
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       if (cell.value) cell.fill = solidFill("FFE7F3EB");
@@ -145,23 +151,23 @@ function createMatrixSheet(workbook: Workbook, rows: StatusReportRow[], statuses
     rows.length,
     null,
     null,
-    { formula: rows.length ? `SUM(E5:E${4 + rows.length})` : "0", result: totalCost },
+    ...(includeExpenses ? [{ formula: rows.length ? `SUM(E5:E${4 + rows.length})` : "0", result: totalCost }] : []),
     ...statuses.map((status, index) => ({
-      formula: rows.length ? `COUNT(${columnLetter(6 + index)}5:${columnLetter(6 + index)}${4 + rows.length})` : "0",
+      formula: rows.length ? `COUNT(${columnLetter(firstStageColumn + index)}5:${columnLetter(firstStageColumn + index)}${4 + rows.length})` : "0",
       result: rows.filter((row) => row.progress.has(status.id)).length,
     })),
   ]);
   totalRow.font = { bold: true, color: { argb: "FF173126" } };
   totalRow.fill = solidFill("FFDDEBE2");
-  totalRow.getCell(5).numFmt = '#,##0.00 "UAH"';
+  if (includeExpenses) totalRow.getCell(5).numFmt = '#,##0.00 "UAH"';
   totalRow.alignment = { vertical: "middle", horizontal: "center" };
-  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + rows.length, column: 5 + statuses.length } };
+  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + rows.length, column: fixedColumns + statuses.length } };
   sheet.eachRow((row, rowNumber) => row.eachCell({ includeEmpty: true }, (cell) => {
     if (rowNumber >= 4) cell.border = thinBorder();
   }));
 }
 
-function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], labels: Labels, locale: AppLocale) {
+function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuses: PlotStatusDefinition[], labels: Labels, locale: AppLocale, includeExpenses: boolean) {
   const dateFormat = xlsxDateFormat(locale);
   const sheet = workbook.addWorksheet(labels.detailsSheet, { views: [{ state: "frozen", ySplit: 1 }] });
   sheet.columns = [
@@ -172,7 +178,7 @@ function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuse
     { header: labels.stage, key: "stage", width: 42 },
     { header: labels.completed, key: "completed", width: 14 },
     { header: labels.completionDate, key: "completedAt", width: 21 },
-    { header: labels.expenses, key: "cost", width: 18 },
+    ...(includeExpenses ? [{ header: labels.expenses, key: "cost", width: 18 }] : []),
   ];
   styleHeader(sheet.getRow(1));
   sheet.getRow(1).height = 34;
@@ -191,19 +197,21 @@ function createDetailsSheet(workbook: Workbook, rows: StatusReportRow[], statuse
     });
     row.alignment = { vertical: "middle", wrapText: true };
     row.getCell(7).numFmt = dateFormat.dateTime;
-    row.getCell(8).numFmt = '#,##0.00 "UAH"';
+    if (includeExpenses) row.getCell(8).numFmt = '#,##0.00 "UAH"';
     if (entry) row.getCell(6).fill = solidFill("FFE7F3EB");
   }));
-  sheet.autoFilter = { from: "A1", to: `H${Math.max(1, sheet.rowCount)}` };
+  sheet.autoFilter = { from: "A1", to: `${includeExpenses ? "H" : "G"}${Math.max(1, sheet.rowCount)}` };
   sheet.eachRow((row) => row.eachCell({ includeEmpty: true }, (cell) => { cell.border = thinBorder(); }));
   sheet.getCell("J1").value = labels.generated;
   sheet.getCell("J2").value = new Date();
   sheet.getCell("J2").numFmt = dateFormat.dateTime;
-  sheet.getCell("J4").value = labels.currencyNote;
-  sheet.getCell("J4").alignment = { wrapText: true };
+  if (includeExpenses) {
+    sheet.getCell("J4").value = labels.currencyNote;
+    sheet.getCell("J4").alignment = { wrapText: true };
+    sheet.getCell("J4").font = { color: { argb: "FF66756D" }, italic: true };
+  }
   sheet.getColumn("J").width = 28;
   sheet.getCell("J1").font = { bold: true };
-  sheet.getCell("J4").font = { color: { argb: "FF66756D" }, italic: true };
 }
 
 function styleHeader(row: import("exceljs").Row) {

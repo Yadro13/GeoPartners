@@ -130,10 +130,10 @@ export function downloadText(content: string, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function plotsToCsv(plots: PlotFeature[]) {
+export function plotsToCsv(plots: PlotFeature[], includeExpenses = true) {
   const rows = [
-    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пов'язані результати", "Пройдені етапи", "Загальні витрати, грн"],
-    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, parsePlotResultLinks(properties.resultLinks).map(({ type, number }) => `${type}: ${number}`).join(", "), properties.statusProgress?.length ?? 0, totalPlotStatusCost(properties.statusProgress)]),
+    ["Кадастровий номер", "Назва", "Категорія", "Площа, га", "Власник", "Орендар", "Пов'язані результати", "Пройдені етапи", ...(includeExpenses ? ["Загальні витрати, грн"] : [])],
+    ...plots.map(({ properties }) => [properties.cadastralNumber, properties.name, properties.category, properties.areaHa, properties.owner, properties.lessee, parsePlotResultLinks(properties.resultLinks).map(({ type, number }) => `${type}: ${number}`).join(", "), properties.statusProgress?.length ?? 0, ...(includeExpenses ? [totalPlotStatusCost(properties.statusProgress)] : [])]),
   ];
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
 }

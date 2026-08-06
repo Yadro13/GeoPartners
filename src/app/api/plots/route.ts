@@ -9,12 +9,14 @@ import { auditValues, changedPlotFields } from "@/lib/audit";
 import { hasPermission } from "@/lib/permissions";
 import { getDataWorkspace } from "@/lib/data-workspace";
 import { resolvePlotStatusProgress } from "@/lib/plot-status-directory";
+import { clearPlotExpenses, plotForExpenseAccess } from "@/lib/plot-expenses";
 
 export async function GET() {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   const workspace = await getDataWorkspace();
-  return NextResponse.json((await db.select().from(plot).where(eq(plot.workspace, workspace))).map(plotRowToFeature));
+  const canViewExpenses = hasPermission(currentUser, "expenses.view");
+  return NextResponse.json((await db.select().from(plot).where(eq(plot.workspace, workspace))).map(plotRowToFeature).map((feature) => plotForExpenseAccess(feature, canViewExpenses)));
 }
 
 export async function POST(request: Request) {
@@ -23,7 +25,8 @@ export async function POST(request: Request) {
   if (!hasPermission(currentUser, "plots.create")) return NextResponse.json({ error: "Недостатньо прав для створення ділянки." }, { status: 403 });
   try {
     const workspace = await getDataWorkspace();
-    const feature = parsePlotFeature(await request.json());
+    let feature = parsePlotFeature(await request.json());
+    if (!hasPermission(currentUser, "expenses.manage")) feature = clearPlotExpenses(feature);
     const statusState = await resolvePlotStatusProgress(workspace, feature.properties.statusProgress ?? [], feature.properties.status ?? "");
     feature.properties.statusProgress = statusState.progress;
     feature.properties.status = statusState.currentStatus;
@@ -37,7 +40,7 @@ export async function POST(request: Request) {
       await tx.insert(plot).values({ ...featureToPlotValues(feature), workspace });
       await tx.insert(auditLog).values(auditValues(currentUser, workspace, { action: "plot.created", entityType: "plot", entityId: feature.properties.id, cadastralNumber: feature.properties.cadastralNumber, summary: `Створено ділянку ${feature.properties.cadastralNumber}.`, details: { changes: changedPlotFields(null, feature), source: "manual" } }));
     });
-    return NextResponse.json(feature, { status: 201 });
+    return NextResponse.json(plotForExpenseAccess(feature, hasPermission(currentUser, "expenses.view")), { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Некоректні дані." }, { status: 400 });
   }

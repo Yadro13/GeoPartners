@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auditLog, plotVersion } from "@/db/schema";
 import { getCurrentUser } from "@/lib/access";
 import { getDataWorkspace } from "@/lib/data-workspace";
+import { hasPermission } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   const currentUser = await getCurrentUser();
@@ -29,6 +30,18 @@ export async function GET(request: Request) {
     db.select({ entry: auditLog, versionId: plotVersion.id }).from(auditLog).leftJoin(plotVersion, and(eq(plotVersion.auditLogId, auditLog.id), eq(plotVersion.workspace, workspace))).where(where).orderBy(desc(auditLog.createdAt)).limit(limit).offset((page - 1) * limit),
     db.select({ count: sql<number>`count(*)::int` }).from(auditLog).where(where),
   ]);
-  const items = rows.map(({ entry, versionId }) => ({ ...entry, canRestore: Boolean(versionId) }));
+  const canViewExpenses = hasPermission(currentUser, "expenses.view");
+  const items = rows.map(({ entry, versionId }) => ({
+    ...entry,
+    details: canViewExpenses ? entry.details : withoutExpenseAuditDetails(entry.details),
+    canRestore: Boolean(versionId),
+  }));
   return NextResponse.json({ items, total: countRows[0]?.count ?? 0, page, limit }, { headers: { "cache-control": "no-store" } });
+}
+
+function withoutExpenseAuditDetails(details: Record<string, unknown>) {
+  const changes = Array.isArray(details.changes)
+    ? details.changes.map((value) => value === "Етапи та витрати" ? "Етапи" : value)
+    : details.changes;
+  return { ...details, changes };
 }

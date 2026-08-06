@@ -1,9 +1,9 @@
 export type AppRole = "user" | "admin";
 export type AppAccessLevel = "read" | "edit";
-export type AppPermission = "plots.create" | "plots.update" | "plots.delete" | "imports.run" | "categories.manage" | "statuses.manage" | "versions.restore" | "users.manage" | "workspaces.manage" | "snapshots.capture";
+export type AppPermission = "plots.create" | "plots.update" | "plots.delete" | "imports.run" | "categories.manage" | "statuses.manage" | "versions.restore" | "users.manage" | "workspaces.manage" | "snapshots.capture" | "snapshots.view" | "expenses.view" | "expenses.manage";
 
 const editorPermissions = new Set<AppPermission>(["plots.create", "plots.update"]);
-const adminPermissions = new Set<AppPermission>(["plots.create", "plots.update", "plots.delete", "imports.run", "categories.manage", "statuses.manage", "versions.restore", "users.manage", "workspaces.manage", "snapshots.capture"]);
+const adminPermissions = new Set<AppPermission>(["plots.create", "plots.update", "plots.delete", "imports.run", "categories.manage", "statuses.manage", "versions.restore", "users.manage", "workspaces.manage", "snapshots.capture", "snapshots.view", "expenses.view", "expenses.manage"]);
 
 export function hasPermission(user: { role: AppRole; accessLevel: AppAccessLevel }, permission: AppPermission) {
   if (user.role === "admin") return adminPermissions.has(permission);
