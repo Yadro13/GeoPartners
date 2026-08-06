@@ -340,7 +340,7 @@ const wtgReportLocales = {
   assert((await page.getByRole("dialog").getByLabel("Назва").count()) === 0, "plot editor omits the redundant name field");
   await page.locator('select[name="category"]').selectOption({ label: "ВЕУ" });
   await page.locator(".result-link-row__toggle input").check();
-  await page.getByLabel("ВЕУ: номер 1").fill("1");
+  await page.getByLabel("ВЕУ: номер").fill("1");
   await page.locator(".geometry-editor__neighbor").first().waitFor();
   assert((await page.locator(".geometry-editor__neighbor").count()) === 3, "geometry editor shows neighboring plots as snap references");
   const neighborGeometry = await page.evaluate(() => JSON.parse(localStorage.getItem("geopartners-preview") || "{}").plots?.[0]?.geometry);

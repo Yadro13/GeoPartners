@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, Plus, Save, Trash2, X } from "lucide-react";
+import { AlertTriangle, Save, Trash2, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import type { Polygon } from "geojson";
 import { resultTypeByCategoryRole, type CategoryDefinition } from "@/data/demo";
@@ -77,32 +77,18 @@ function ResultLinksEditor({ allowedTypes, links, neighbors, categories, categor
   const t = useTranslations("plotForm");
   const labels: Record<PlotResultType, string> = { wtg: t("resultWtg"), road: t("resultRoad"), servitude: t("resultServitude"), substation: t("resultSubstation") };
   const setEnabled = (type: PlotResultType, enabled: boolean) => onChange(enabled ? [...links, { type, number: "" }] : links.filter((link) => link.type !== type));
-  const setNumber = (type: PlotResultType, index: number, number: string) => {
-    let currentIndex = -1;
-    onChange(links.map((link) => {
-      if (link.type !== type) return link;
-      currentIndex += 1;
-      return currentIndex === index ? { ...link, number } : link;
-    }));
-  };
-  const removeNumber = (type: PlotResultType, index: number) => {
-    let currentIndex = -1;
-    onChange(links.filter((link) => {
-      if (link.type !== type) return true;
-      currentIndex += 1;
-      return currentIndex !== index;
-    }));
-  };
+  const setNumber = (type: PlotResultType, number: string) => onChange(links.map((link) => link.type === type ? { ...link, number } : link));
+  const removeNumber = (type: PlotResultType) => onChange(links.filter((link) => link.type !== type));
 
   return <fieldset className="result-links-editor form-grid__wide"><legend>{t("resultLinks")}</legend><p>{t("resultLinksHint")}</p>{allowedTypes.map((type) => {
-    const typeLinks = links.filter((link) => link.type === type);
+    const link = links.find((item) => item.type === type);
     const managesGroup = canManageGroup && category?.systemRole ? resultTypeByCategoryRole[category.systemRole] === type : false;
-    return <div className="result-link-row" key={type}><label className="result-link-row__toggle"><input type="checkbox" checked={typeLinks.length > 0} onChange={(event) => setEnabled(type, event.target.checked)} /><span>{labels[type]}</span></label><div className="result-link-row__numbers">{typeLinks.map((link, index) => {
+    return <div className="result-link-row" key={type}><label className="result-link-row__toggle"><input type="checkbox" checked={Boolean(link)} onChange={(event) => setEnabled(type, event.target.checked)} /><span>{labels[type]}</span></label><div className="result-link-row__numbers">{link ? (() => {
       const key = resultLinkKey(type, link.number);
       const defaultSelection = matchingCandidates(type, link.number, neighbors, categories).map(({ properties }) => properties.id);
       const selectedIds = assignments[key] ?? defaultSelection;
-      return <div key={`${type}-${index}`}><input aria-label={t("resultNumber", { type: labels[type], index: index + 1 })} required maxLength={80} value={link.number} onChange={(event) => setNumber(type, index, event.target.value)} /><button className="icon-button" type="button" onClick={() => removeNumber(type, index)} title={t("removeResultNumber", { number: link.number || index + 1 })} aria-label={t("removeResultNumber", { number: link.number || index + 1 })}><X size={16} /></button><ResultLinkMatches type={type} number={link.number} plots={neighbors} categories={categories} />{managesGroup && link.number.trim() ? <ResultGroupEditor typeLabel={labels[type]} number={link.number} plots={neighbors} categories={categories} selectedIds={selectedIds} onChange={(ids) => onAssignmentsChange({ ...assignments, [key]: ids })} /> : null}</div>;
-    })}{typeLinks.length ? <button className="result-link-row__add" type="button" onClick={() => onChange([...links, { type, number: "" }])}><Plus size={15} />{t("addResultNumber")}</button> : null}</div></div>;
+      return <div><input aria-label={t("resultNumber", { type: labels[type] })} required maxLength={80} value={link.number} onChange={(event) => setNumber(type, event.target.value)} /><button className="icon-button" type="button" onClick={() => removeNumber(type)} title={t("removeResultNumber", { number: link.number || labels[type] })} aria-label={t("removeResultNumber", { number: link.number || labels[type] })}><X size={16} /></button><ResultLinkMatches type={type} number={link.number} plots={neighbors} categories={categories} />{managesGroup && link.number.trim() ? <ResultGroupEditor typeLabel={labels[type]} number={link.number} plots={neighbors} categories={categories} selectedIds={selectedIds} onChange={(ids) => onAssignmentsChange({ ...assignments, [key]: ids })} /> : null}</div>;
+    })() : null}</div></div>;
   })}</fieldset>;
 }
 
@@ -155,7 +141,7 @@ function buildCandidateUpdates(plots: PlotFeature[], categories: Record<string, 
       const hasLink = current.some((item) => resultLinkKey(item.type, item.number) === key);
       const shouldHaveLink = selected.has(plot.properties.id);
       if (hasLink === shouldHaveLink) continue;
-      const resultLinks = shouldHaveLink ? [...current, link] : current.filter((item) => resultLinkKey(item.type, item.number) !== key);
+      const resultLinks = shouldHaveLink ? [...current.filter((item) => item.type !== link.type), link] : current.filter((item) => resultLinkKey(item.type, item.number) !== key);
       updates.set(plot.properties.id, { ...plot, properties: { ...plot.properties, resultLinks: parsePlotResultLinks(resultLinks) } });
     }
   }

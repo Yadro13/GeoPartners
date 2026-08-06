@@ -27,11 +27,12 @@ test("groups main, alternative, and final plots by WTG number", () => {
   assert.equal(groups[0].totalCost, 125);
 });
 
-test("places a plot into every linked WTG group and sorts numbers naturally", () => {
+test("places each plot into its single WTG group and sorts numbers naturally", () => {
   const groups = buildWtgReportGroups([
-    plot("multi", "planned_wtg", [{ type: "wtg", number: "10" }, { type: "wtg", number: "2" }]),
+    plot("ten", "planned_wtg", [{ type: "wtg", number: "10" }]),
+    plot("two", "planned_wtg", [{ type: "wtg", number: "2" }]),
   ], defaultCategories);
 
   assert.deepEqual(groups.map(({ number }) => number), ["2", "10"]);
-  assert.ok(groups.every(({ primary }) => primary?.properties.id === "multi"));
+  assert.deepEqual(groups.map(({ primary }) => primary?.properties.id), ["two", "ten"]);
 });

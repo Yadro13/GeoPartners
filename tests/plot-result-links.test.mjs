@@ -2,14 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parsePlotResultLinks } from "../src/lib/plot-result-links.ts";
 
-test("keeps multiple result numbers for one work type", () => {
+test("keeps one number per work type while preserving different types", () => {
   assert.deepEqual(parsePlotResultLinks([
     { type: "wtg", number: "  WTG 01  " },
     { type: "wtg", number: "WTG 02" },
     { type: "road", number: "R-1" },
   ]), [
     { type: "wtg", number: "WTG 01" },
-    { type: "wtg", number: "WTG 02" },
     { type: "road", number: "R-1" },
   ]);
 });
@@ -28,6 +27,6 @@ test("limits imported links and number length", () => {
   const links = Array.from({ length: 120 }, (_, index) => ({ type: "substation", number: `${index}-${"x".repeat(100)}` }));
   const parsed = parsePlotResultLinks(links);
 
-  assert.equal(parsed.length, 100);
+  assert.equal(parsed.length, 1);
   assert.equal(parsed[0].number.length, 80);
 });

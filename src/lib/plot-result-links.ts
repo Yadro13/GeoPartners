@@ -6,7 +6,7 @@ export type PlotResultLink = { type: PlotResultType; number: string };
 export function parsePlotResultLinks(value: unknown): PlotResultLink[] {
   if (!Array.isArray(value)) return [];
   const result: PlotResultLink[] = [];
-  const seen = new Set<string>();
+  const seen = new Set<PlotResultType>();
 
   for (const item of value.slice(0, 100)) {
     if (!item || typeof item !== "object") continue;
@@ -15,12 +15,10 @@ export function parsePlotResultLinks(value: unknown): PlotResultLink[] {
     const number = candidate.number.trim().replace(/\s+/g, " ").slice(0, 80);
     if (!number) continue;
     const type = candidate.type as PlotResultType;
-    const key = `${type}:${number.toLocaleLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(type)) continue;
+    seen.add(type);
     result.push({ type, number });
   }
 
   return result;
 }
-
