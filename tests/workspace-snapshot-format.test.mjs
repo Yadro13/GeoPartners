@@ -50,6 +50,7 @@ test("keeps the integrity hash stable after PostgreSQL JSONB reorders object key
   const categories = { default: { name: "Default", description: "", color: "#000000", visible: true, systemRole: "default" } };
   const plotStatuses = [{ id: "status-1", name: "Stage 1" }];
   const payload = buildWorkspaceSnapshotPayload({ workspace: "production", capturedAt: "2026-07-31T20:00:00.000Z", categories, plotStatuses, plots: [plot] });
+  payload.plots[0].properties.sourceFilename = undefined;
   const samePayloadWithDifferentInsertionOrder = {
     plots: payload.plots.map((item) => ({ properties: Object.fromEntries(Object.entries(item.properties).reverse()), geometry: { coordinates: item.geometry.coordinates, type: item.geometry.type }, type: item.type })),
     plotStatuses: payload.plotStatuses.map((status) => ({ name: status.name, id: status.id })),
@@ -59,4 +60,5 @@ test("keeps the integrity hash stable after PostgreSQL JSONB reorders object key
     formatVersion: payload.formatVersion,
   };
   assert.equal(hashWorkspaceSnapshot(samePayloadWithDifferentInsertionOrder), hashWorkspaceSnapshot(payload));
+  assert.equal(hashWorkspaceSnapshot(JSON.parse(JSON.stringify(payload))), hashWorkspaceSnapshot(payload));
 });
