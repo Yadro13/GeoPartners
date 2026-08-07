@@ -27,9 +27,16 @@ test("GeoJSON without cadastral metadata uses the filename stem as identifier", 
 
 test("special report details are localized and include specialized values", () => {
   const road = formatPlotSpecialDetails({ ...baseProperties, roadOwnershipType: "municipal" }, "road", "uk");
+  assert.match(road, /1,25 га/);
   assert.match(road, /Комунальна/);
   const servitude = formatPlotSpecialDetails({ ...baseProperties, servitudeValidFrom: "2026-08-01", servitudeValidUntil: "2027-08-01", servitudePaymentAmount: 1200, servitudePaymentPeriod: "yearly" }, "servitude", "en");
   assert.match(servitude, /yearly/);
   const substation = formatPlotSpecialDetails({ ...baseProperties, substationType: "110\/35 kV", substationCapacityMw: 80 }, "substation", "de");
   assert.match(substation, /80 MW/);
+});
+
+test("candidate report details omit final-object parameters", () => {
+  const candidate = formatPlotSpecialDetails({ ...baseProperties, servitudeValidFrom: "2026-08-01", servitudeValidUntil: "2027-08-01", servitudePaymentAmount: 1200, servitudePaymentPeriod: "yearly" }, "servitude", "uk", false);
+  assert.match(candidate, /Площа: 1,25 га/);
+  assert.doesNotMatch(candidate, /Строк дії|Оплата/);
 });

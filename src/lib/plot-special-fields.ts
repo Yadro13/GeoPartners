@@ -1,6 +1,7 @@
 import type { PlotProperties } from "../data/demo.ts";
 import { parsePlotResultLinks, type PlotResultType } from "./plot-result-links.ts";
 import { intlLocale, type AppLocale } from "../i18n/config.ts";
+import { areaUnit } from "./localized-values.ts";
 
 export const roadOwnershipTypes = ["private", "municipal"] as const;
 export type RoadOwnershipType = (typeof roadOwnershipTypes)[number];
@@ -48,11 +49,11 @@ const detailLabels: Record<AppLocale, { area: string; ownership: string; private
   de: { area: "Fläche", ownership: "Eigentum", private: "Privat", municipal: "Kommunal", term: "Laufzeit", payment: "Zahlung", periods: { one_time: "einmalig", monthly: "monatlich", yearly: "jährlich", other: "sonstiges" }, substationType: "Typ", capacity: "Leistung" },
 };
 
-export function formatPlotSpecialDetails(properties: PlotProperties, type: PlotResultType, locale: AppLocale) {
+export function formatPlotSpecialDetails(properties: PlotProperties, type: PlotResultType, locale: AppLocale, includeSpecialized = true) {
   const labels = detailLabels[locale];
-  const values = [`${labels.area}: ${properties.areaHa.toLocaleString(intlLocale(locale), { maximumFractionDigits: 4 })} ha`];
-  if (type === "road" && properties.roadOwnershipType) values.push(`${labels.ownership}: ${properties.roadOwnershipType === "private" ? labels.private : labels.municipal}`);
-  if (type === "servitude") {
+  const values = [`${labels.area}: ${properties.areaHa.toLocaleString(intlLocale(locale), { maximumFractionDigits: 4 })} ${areaUnit(locale)}`];
+  if (includeSpecialized && type === "road" && properties.roadOwnershipType) values.push(`${labels.ownership}: ${properties.roadOwnershipType === "private" ? labels.private : labels.municipal}`);
+  if (includeSpecialized && type === "servitude") {
     const term = [properties.servitudeValidFrom, properties.servitudeValidUntil].filter(Boolean).join(" - ");
     if (term) values.push(`${labels.term}: ${term}`);
     if (properties.servitudePaymentAmount !== null && properties.servitudePaymentAmount !== undefined) {
@@ -60,7 +61,7 @@ export function formatPlotSpecialDetails(properties: PlotProperties, type: PlotR
       values.push(`${labels.payment}: ${amount}${properties.servitudePaymentPeriod ? `, ${labels.periods[properties.servitudePaymentPeriod]}` : ""}`);
     }
   }
-  if (type === "substation") {
+  if (includeSpecialized && type === "substation") {
     if (properties.substationType) values.push(`${labels.substationType}: ${properties.substationType}`);
     if (properties.substationCapacityMw !== null && properties.substationCapacityMw !== undefined) values.push(`${labels.capacity}: ${properties.substationCapacityMw.toLocaleString(intlLocale(locale), { maximumFractionDigits: 3 })} MW`);
   }

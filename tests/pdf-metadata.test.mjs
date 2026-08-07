@@ -25,7 +25,7 @@ const sample = `
 test("extracts document currency, every owner, and the full multiline lessee", () => {
   const metadata = extractLandDocumentMetadata(sample);
 
-  assert.equal(metadata.documentActualAt, "2026-08-05T09:07:00");
+  assert.equal(metadata.documentActualAt, "2026-08-05");
   assert.equal(metadata.owner, "Яржемська Раїса Андріївна, Петренко Олена Іванівна");
   assert.equal(metadata.lessee, 'ФЕРМЕРСЬКЕ ГОСПОДАРСТВО "ДОВГА НАЗВА" ДРУГИЙ РЯДОК НАЗВИ');
 });

@@ -1,10 +1,10 @@
 import { ExternalLink, FileText, ListChecks, Pencil } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import { totalPlotStatusCost } from "@/lib/plot-status-progress";
 import { parsePlotResultLinks, type PlotResultType } from "@/lib/plot-result-links";
-import { hasResultType } from "@/lib/plot-special-fields";
+import { areaUnit, documentDateForDisplay } from "@/lib/localized-values";
 import type { PlotFeature } from "./types";
 
 type PlotDetailsProps = {
@@ -23,6 +23,7 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
   const t = useTranslations("workspace");
   const formT = useTranslations("plotForm");
   const format = useFormatter();
+  const locale = useLocale();
   if (!plot) {
     return <div className="plot-details-empty">{t("selectPlot")}</div>;
   }
@@ -34,9 +35,10 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
   const resultLinks = parsePlotResultLinks(properties.resultLinks);
   const resultLabels: Record<PlotResultType, string> = { wtg: t("resultWtg"), road: t("resultRoad"), servitude: t("resultServitude"), substation: t("resultSubstation") };
   const categoryRole = categories[properties.category]?.systemRole;
-  const roadRelated = hasResultType(properties, "road") || categoryRole === "road_result";
-  const servitudeRelated = hasResultType(properties, "servitude") || categoryRole === "servitude_result";
-  const substationRelated = hasResultType(properties, "substation") || categoryRole === "substation_result";
+  const roadRelated = categoryRole === "road_result";
+  const servitudeRelated = categoryRole === "servitude_result";
+  const substationRelated = categoryRole === "substation_result";
+  const documentDate = documentDateForDisplay(properties.documentActualAt);
 
   return (
     <div className="plot-details" data-compact={compact}>
@@ -45,9 +47,10 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
           <span className="eyebrow">{t("cadastralNumber")}</span>
           <h2>{properties.cadastralNumber}</h2>
         </div>
-        {onEdit ? <button className="icon-button" type="button" onClick={() => onEdit(plot)} title={t("editPlot")} aria-label={t("editPlot")}>
-          <Pencil size={18} aria-hidden="true" />
-        </button> : null}
+        <div className="plot-details__header-actions">
+          {properties.documentUrl ? <a className="command-button plot-details__pdf" href={properties.documentUrl} target="_blank" rel="noreferrer"><FileText size={17} aria-hidden="true" />{t("viewPdf")}</a> : null}
+          {onEdit ? <button className="icon-button" type="button" onClick={() => onEdit(plot)} title={t("editPlot")} aria-label={t("editPlot")}><Pencil size={18} aria-hidden="true" /></button> : null}
+        </div>
       </header>
 
       <div className="category-line">
@@ -56,9 +59,9 @@ export function PlotDetails({ plot, compact = false, categories, plotStatuses, c
       </div>
 
       <dl className="details-grid">
-        <div><dt>{t("area")}</dt><dd>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} ha</dd></div>
+        <div><dt>{t("area")}</dt><dd>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} {areaUnit(locale)}</dd></div>
         <div><dt>{t("stages")}</dt><dd>{t("stagesDone", { done: completedStages.length, total: plotStatuses.length })}</dd></div>
-        {properties.documentActualAt ? <div><dt>{t("documentActualAt")}</dt><dd>{format.dateTime(new Date(properties.documentActualAt), { dateStyle: "medium", timeStyle: "short" })}</dd></div> : null}
+        {documentDate ? <div><dt>{t("documentActualAt")}</dt><dd>{format.dateTime(documentDate, { dateStyle: "medium" })}</dd></div> : null}
         {canViewExpenses && totalCost > 0 ? <div><dt>{t("totalExpenses")}</dt><dd>{format.number(totalCost, { style: "currency", currency: "UAH" })}</dd></div> : null}
         <div className="details-grid__wide"><dt>{t("owner")}</dt><dd>{properties.owner || t("notSpecified")}</dd></div>
         <div className="details-grid__wide"><dt>{t("lessee")}</dt><dd>{properties.lessee || t("notSpecified")}</dd></div>

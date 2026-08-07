@@ -70,8 +70,8 @@ function extractFieldValue(lines: string[], index: number, label: RegExp, stops:
 function extractRequestDate(text: string) {
   const match = text.match(/(?:Час\s+та\s+дата|Дата\s+та\s+час)\s+запиту\s*:?\s*(\d{1,2}):(\d{2})\s+(\d{1,2})[-./]([01]?\d)[-./](\d{4})/i);
   if (!match) return "";
-  const [, hours, minutes, day, month, year] = match;
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hours.padStart(2, "0")}:${minutes}:00`;
+  const [, , , day, month, year] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 function extractFollowingValue(lines: string[], label: RegExp) {

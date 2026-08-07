@@ -1,6 +1,7 @@
 import { ChevronRight, MapPin } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import type { CategoryDefinition } from "@/data/demo";
+import { areaUnit } from "@/lib/localized-values";
 import type { PlotFeature } from "./types";
 
 type PlotListProps = {
@@ -13,6 +14,7 @@ type PlotListProps = {
 export function PlotList({ plots, selectedId, onSelect, categories }: PlotListProps) {
   const t = useTranslations("plotList");
   const format = useFormatter();
+  const locale = useLocale();
   if (plots.length === 0) {
     return <div className="plot-list-empty">{t("empty")}</div>;
   }
@@ -37,7 +39,7 @@ export function PlotList({ plots, selectedId, onSelect, categories }: PlotListPr
             <span className="plot-row__body">
               <strong>{properties.cadastralNumber}</strong>
               <span>{category.name}</span>
-              <small>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} ha</small>
+              <small>{format.number(properties.areaHa, { maximumFractionDigits: 4 })} {areaUnit(locale)}</small>
             </span>
             <ChevronRight className="plot-row__arrow" aria-hidden="true" size={18} />
           </button>
