@@ -673,6 +673,7 @@
     "googleConnectFailed": "Could not connect Google.",
     "dataExchange": "Data exchange",
     "settings": "Settings",
+    "appVersion": "Version {version}",
     "importData": "Import data",
     "exportGeoJson": "Export GeoJSON",
     "exportCsv": "Export CSV",

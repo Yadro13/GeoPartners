@@ -673,6 +673,7 @@
     "googleConnectFailed": "Не вдалося підключити Google.",
     "dataExchange": "Обмін даними",
     "settings": "Налаштування",
+    "appVersion": "Версія {version}",
     "importData": "Імпортувати дані",
     "exportGeoJson": "Експортувати GeoJSON",
     "exportCsv": "Експортувати CSV",

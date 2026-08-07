@@ -272,6 +272,7 @@ const additionalResultViews = {
 
   await page.getByTitle("Налаштування").evaluate((element) => element.click());
   await page.getByRole("heading", { name: "Налаштування", exact: true }).waitFor();
+  await page.getByText("Версія 0.6.1", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Імпортувати дані" }).click();
   await page.getByRole("button", { name: /^Вибрати папку/ }).waitFor();
   await page.getByRole("button", { name: /^Вибрати GeoJSON, PDF або ZIP/ }).waitFor();
