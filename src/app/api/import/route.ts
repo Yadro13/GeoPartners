@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const geoFiles = files.filter((file) => /\.(geo)?json$/i.test(file.name)); const pdfFiles = files.filter((file) => /\.pdf$/i.test(file.name));
     serverLog("info", "import.started", { workspace, fileCount: files.length, geoJsonCount: geoFiles.length, pdfCount: pdfFiles.length });
     if (!geoFiles.length) throw new Error("Додайте хоча б один GeoJSON з координатами.");
-    const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder))]);
+    const [pdfs, existingRows, statusRows] = await Promise.all([Promise.all(pdfFiles.map(parsePdfFile)), db.select().from(plot).where(eq(plot.workspace, workspace)), db.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(and(eq(plotStatus.workspace, workspace), eq(plotStatus.scope, "plots"))).orderBy(asc(plotStatus.sortOrder))]);
     const existingByIdentity = new Map(existingRows.map((row) => [plotIdentityKey(row.cadastralNumber), row]));
     const knownStatuses = new Set(statusRows.map(({ name }) => name));
     const knownStatusIds = new Set(statusRows.map(({ id }) => id));

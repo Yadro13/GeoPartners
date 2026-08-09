@@ -1,6 +1,6 @@
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLog, category, plot, plotStatus, workspaceSnapshot } from "@/db/schema";
+import { auditLog, category, plot, plotStatus, resultStatusProgress, workspaceSnapshot } from "@/db/schema";
 import { auditValues } from "@/lib/audit";
 import type { DataWorkspace } from "@/lib/data-workspace";
 import { categoryRowsToRecord, plotRowToFeature } from "@/lib/plots";
@@ -17,13 +17,15 @@ export async function captureWorkspaceSnapshot({ workspace, actor = null, source
       if (existing) return { snapshot: existing, created: false };
     }
     const categoryRows = await tx.select().from(category).where(eq(category.workspace, workspace)).orderBy(asc(category.id));
-    const statusRows = await tx.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder));
+    const statusRows = await tx.select({ id: plotStatus.id, name: plotStatus.name, scope: plotStatus.scope }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.scope), asc(plotStatus.sortOrder));
+    const resultProgressRows = await tx.select().from(resultStatusProgress).where(eq(resultStatusProgress.workspace, workspace));
     const plotRows = await tx.select().from(plot).where(eq(plot.workspace, workspace)).orderBy(asc(plot.id));
     const payload = buildWorkspaceSnapshotPayload({
       workspace,
       capturedAt,
       categories: categoryRowsToRecord(categoryRows),
       plotStatuses: statusRows,
+      resultStatusProgress: resultProgressRows.map((entry) => ({ resultType: entry.resultType, resultNumber: entry.resultNumber, statusId: entry.statusId, completedAt: entry.completedAt.toISOString(), cost: entry.cost === null ? null : Number(entry.cost) })),
       plots: plotRows.map(plotRowToFeature),
     });
     const contentHash = hashWorkspaceSnapshot(payload);
@@ -50,7 +52,7 @@ export async function captureWorkspaceSnapshot({ workspace, actor = null, source
       entityType: "workspace-snapshot",
       entityId: snapshot.id,
       summary: `Створено знімок ${workspace === "sandbox" ? "тестової" : "робочої"} бази.`,
-      details: { source, contentHash, plots: payload.plots.length, categories: categoryRows.length, statuses: statusRows.length },
+      details: { source, contentHash, plots: payload.plots.length, categories: categoryRows.length, statuses: statusRows.length, resultStages: resultProgressRows.length },
     } as const;
     await tx.insert(auditLog).values(actor ? auditValues(actor, workspace, auditInput) : {
       workspace,

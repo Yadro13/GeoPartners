@@ -6,6 +6,7 @@ import { parsePlotStatusProgress, totalPlotStatusCost } from "@/lib/plot-status-
 import { parsePlotResultLinks } from "@/lib/plot-result-links";
 import { nullableNumber, parseRoadOwnershipType, parseServitudePaymentPeriod, sourcePlotIdentifier } from "@/lib/plot-special-fields";
 import { parseImportDecisions } from "@/lib/import-merge";
+import type { ResultStatusProgress } from "@/lib/result-status-progress";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -127,8 +128,8 @@ function normalizeCategories(value: unknown) {
   }));
 }
 
-export function toFeatureCollection(plots: PlotFeature[], categories: Record<string, CategoryDefinition>): FeatureCollection<Polygon, PlotProperties> & { categories: Record<string, CategoryDefinition> } {
-  return { type: "FeatureCollection", categories, features: plots };
+export function toFeatureCollection(plots: PlotFeature[], categories: Record<string, CategoryDefinition>, resultStatusProgress: ResultStatusProgress[] = []): FeatureCollection<Polygon, PlotProperties> & { categories: Record<string, CategoryDefinition>; resultStatusProgress: ResultStatusProgress[] } {
+  return { type: "FeatureCollection", categories, resultStatusProgress, features: plots };
 }
 
 export function downloadText(content: string, filename: string, type: string) {

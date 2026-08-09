@@ -364,6 +364,27 @@
   margin: 4px 0 0;
 }
 
+.plot-status-settings__scope,
+.plot-stages__context {
+  color: var(--muted);
+  display: grid;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.plot-status-settings__scope select,
+.plot-stages__context select {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
 .plot-status-settings footer small {
   color: var(--muted);
   line-height: 1.45;
@@ -3725,6 +3746,10 @@
 
 .plot-stages {
   min-width: 0;
+}
+
+.plot-stages__context {
+  margin-bottom: 12px;
 }
 
 .plot-stages__summary {

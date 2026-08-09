@@ -41,5 +41,8 @@ function countCompletedStatuses(payload: WorkspaceSnapshotPayload) {
       counts.set(statusId, (counts.get(statusId) ?? 0) + 1);
     }
   }
+  for (const entry of payload.resultStatusProgress ?? []) {
+    counts.set(entry.statusId, (counts.get(entry.statusId) ?? 0) + 1);
+  }
   return counts;
 }

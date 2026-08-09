@@ -3,8 +3,9 @@ import type { PlotFeature } from "../components/workspace/types";
 import type { CategoryDefinition } from "../data/demo";
 import type { PlotStatusDefinition } from "../data/plot-statuses";
 import type { DataWorkspace } from "./data-workspace";
+import type { ResultStatusProgress } from "./result-status-progress";
 
-export const workspaceSnapshotFormatVersion = 1 as const;
+export const workspaceSnapshotFormatVersion = 2 as const;
 export type WorkspaceSnapshotSource = "manual" | "scheduled";
 
 export type WorkspaceSnapshotPayload = {
@@ -13,6 +14,7 @@ export type WorkspaceSnapshotPayload = {
   capturedAt: string;
   categories: Record<string, CategoryDefinition>;
   plotStatuses: PlotStatusDefinition[];
+  resultStatusProgress?: ResultStatusProgress[];
   plots: PlotFeature[];
 };
 
@@ -23,6 +25,7 @@ export function buildWorkspaceSnapshotPayload(input: Omit<WorkspaceSnapshotPaylo
     capturedAt: typeof input.capturedAt === "string" ? new Date(input.capturedAt).toISOString() : input.capturedAt.toISOString(),
     categories: input.categories,
     plotStatuses: input.plotStatuses,
+    resultStatusProgress: input.resultStatusProgress ?? [],
     plots: input.plots,
   };
 }

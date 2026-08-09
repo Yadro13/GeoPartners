@@ -2,6 +2,7 @@ import type { CategoryDefinition } from "../data/demo";
 import type { PlotFeature } from "../components/workspace/types";
 import { parsePlotResultLinks, type PlotResultType } from "./plot-result-links.ts";
 import { totalPlotStatusCost } from "./plot-status-progress.ts";
+import { progressForResult, type ResultStatusProgress } from "./result-status-progress.ts";
 
 type ProgressEntry = NonNullable<PlotFeature["properties"]["statusProgress"]>[number];
 
@@ -26,7 +27,7 @@ const finalRoleByType = {
   substation: "substation_result",
 } as const;
 
-export function buildResultReportGroups(plots: PlotFeature[], categories: Record<string, CategoryDefinition>, type: PlotResultType) {
+export function buildResultReportGroups(plots: PlotFeature[], categories: Record<string, CategoryDefinition>, type: PlotResultType, resultProgress: ResultStatusProgress[] = []) {
   const groups = new Map<string, Omit<ResultReportGroup, "primary" | "progress" | "completedCount" | "totalCost">>();
 
   for (const plot of plots) {
@@ -44,7 +45,7 @@ export function buildResultReportGroups(plots: PlotFeature[], categories: Record
   const collator = new Intl.Collator("uk", { numeric: true, sensitivity: "base" });
   return [...groups.values()].map((group): ResultReportGroup => {
     const primary = group.mainCandidates[0] ?? null;
-    const entries = primary?.properties.statusProgress ?? [];
+    const entries = progressForResult(resultProgress, type, group.number);
     return { ...group, primary, progress: new Map(entries.map((entry) => [entry.statusId, entry])), completedCount: entries.length, totalCost: totalPlotStatusCost(entries) };
   }).sort((left, right) => collator.compare(left.number, right.number));
 }

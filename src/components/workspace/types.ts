@@ -4,6 +4,7 @@ import type { CategoryDefinition } from "@/data/demo";
 import type { PlotStatusDefinition } from "@/data/plot-statuses";
 import type { DataWorkspace } from "@/lib/data-workspace";
 import type { ManagedUser } from "@/components/admin/UserManagementTable";
+import type { ResultStatusProgress } from "@/lib/result-status-progress";
 
 export type PlotFeature = Feature<Polygon, PlotProperties>;
 
@@ -44,6 +45,7 @@ export type WorkspaceViewProps = {
   query: string;
   categories: Record<string, CategoryDefinition>;
   plotStatuses: PlotStatusDefinition[];
+  resultStatusProgress: ResultStatusProgress[];
   activeSection: WorkspaceSection;
   baseMap: BaseMapId;
   user: WorkspaceUser;

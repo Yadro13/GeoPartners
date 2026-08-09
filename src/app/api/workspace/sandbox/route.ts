@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { auditLog, category, plot } from "@/db/schema";
+import { auditLog, category, plot, resultStatusProgress } from "@/db/schema";
 import { getCurrentUser } from "@/lib/access";
 import { deleteDocument } from "@/lib/document-storage";
 import { hasPermission } from "@/lib/permissions";
@@ -13,12 +13,13 @@ export async function DELETE() {
 
   const documents = await db.select({ key: plot.pdfObjectKey }).from(plot).where(eq(plot.workspace, "sandbox"));
   const documentResults = await Promise.allSettled(documents.flatMap(({ key }) => key ? [deleteDocument(key)] : []));
-  const [deletedPlots, deletedAudit, deletedCategories] = await db.transaction(async (tx) => {
+  const [deletedPlots, deletedAudit, deletedCategories, deletedResultStages] = await db.transaction(async (tx) => {
+    const resultStageRows = await tx.delete(resultStatusProgress).where(eq(resultStatusProgress.workspace, "sandbox")).returning({ id: resultStatusProgress.statusId });
     const plotRows = await tx.delete(plot).where(eq(plot.workspace, "sandbox")).returning({ id: plot.id });
     const auditRows = await tx.delete(auditLog).where(eq(auditLog.workspace, "sandbox")).returning({ id: auditLog.id });
     const categoryRows = await tx.delete(category).where(eq(category.workspace, "sandbox")).returning({ id: category.id });
-    return [plotRows.length, auditRows.length, categoryRows.length] as const;
+    return [plotRows.length, auditRows.length, categoryRows.length, resultStageRows.length] as const;
   });
   const documentErrors = documentResults.filter(({ status }) => status === "rejected").length;
-  return NextResponse.json({ deletedPlots, deletedAudit, deletedCategories, documentErrors });
+  return NextResponse.json({ deletedPlots, deletedAudit, deletedCategories, deletedResultStages, documentErrors });
 }

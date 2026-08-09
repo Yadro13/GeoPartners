@@ -25,15 +25,17 @@ test("builds a versioned snapshot with an exact capture timestamp", () => {
     workspace: "sandbox",
     capturedAt: new Date("2026-08-06T12:00:00.000Z"),
     categories: { default: { name: "Default", description: "", color: "#000000", visible: true, systemRole: "default" } },
-    plotStatuses: [{ id: "status-1", name: "Stage 1" }],
+    plotStatuses: [{ id: "status-1", name: "Stage 1", scope: "plots" }],
+    resultStatusProgress: [{ resultType: "road", resultNumber: "2", statusId: "road-status-1", completedAt: "2026-08-06T11:00:00.000Z", cost: 50 }],
     plots: [plot],
   });
 
-  assert.equal(payload.formatVersion, 1);
+  assert.equal(payload.formatVersion, 2);
   assert.equal(payload.workspace, "sandbox");
   assert.equal(payload.capturedAt, "2026-08-06T12:00:00.000Z");
   assert.equal(payload.plots[0].properties.resultLinks[0].number, "2");
   assert.equal(payload.plots[0].properties.statusProgress[0].cost, 25);
+  assert.equal(payload.resultStatusProgress[0].resultNumber, "2");
 });
 
 test("produces a stable integrity hash and detects content changes", () => {
@@ -48,12 +50,13 @@ test("produces a stable integrity hash and detects content changes", () => {
 
 test("keeps the integrity hash stable after PostgreSQL JSONB reorders object keys", () => {
   const categories = { default: { name: "Default", description: "", color: "#000000", visible: true, systemRole: "default" } };
-  const plotStatuses = [{ id: "status-1", name: "Stage 1" }];
+  const plotStatuses = [{ id: "status-1", name: "Stage 1", scope: "plots" }];
   const payload = buildWorkspaceSnapshotPayload({ workspace: "production", capturedAt: "2026-07-31T20:00:00.000Z", categories, plotStatuses, plots: [plot] });
   payload.plots[0].properties.sourceFilename = undefined;
   const samePayloadWithDifferentInsertionOrder = {
     plots: payload.plots.map((item) => ({ properties: Object.fromEntries(Object.entries(item.properties).reverse()), geometry: { coordinates: item.geometry.coordinates, type: item.geometry.type }, type: item.type })),
-    plotStatuses: payload.plotStatuses.map((status) => ({ name: status.name, id: status.id })),
+    plotStatuses: payload.plotStatuses.map((status) => ({ scope: status.scope, name: status.name, id: status.id })),
+    resultStatusProgress: payload.resultStatusProgress,
     categories: Object.fromEntries(Object.entries(payload.categories).map(([id, category]) => [id, Object.fromEntries(Object.entries(category).reverse())])),
     capturedAt: payload.capturedAt,
     workspace: payload.workspace,

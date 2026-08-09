@@ -4,7 +4,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { Workspace } from "@/components/workspace/Workspace";
 import { getCurrentUser } from "@/lib/access";
 import { db } from "@/db";
-import { category, plot, plotStatus, registrationRequest, user } from "@/db/schema";
+import { category, plot, plotStatus, registrationRequest, resultStatusProgress, user } from "@/db/schema";
 import { categoryRowsToRecord, plotRowToFeature } from "@/lib/plots";
 import { getWorkspaceContext } from "@/lib/data-workspace";
 import { normalizeAppLocale } from "@/i18n/server-locale";
@@ -21,10 +21,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (!currentUser) redirect("/sign-in");
   if (currentUser.approvalStatus !== "approved") redirect("/pending");
   const { workspace, testWorkspaceEnabled } = await getWorkspaceContext();
-  const [plotRows, categoryRows, statusRows, managedUserRows] = await Promise.all([
+  const [plotRows, categoryRows, statusRows, resultProgressRows, managedUserRows] = await Promise.all([
     db.select().from(plot).where(eq(plot.workspace, workspace)),
     db.select().from(category).where(eq(category.workspace, workspace)),
-    db.select({ id: plotStatus.id, name: plotStatus.name }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.sortOrder)),
+    db.select({ id: plotStatus.id, name: plotStatus.name, scope: plotStatus.scope }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.scope), asc(plotStatus.sortOrder)),
+    db.select().from(resultStatusProgress).where(eq(resultStatusProgress.workspace, workspace)),
     currentUser.role === "admin" ? db.select({ account: user, registrationRequestId: registrationRequest.id }).from(user).leftJoin(registrationRequest, eq(registrationRequest.userId, user.id)).orderBy(desc(user.createdAt)) : Promise.resolve([]),
   ]);
   const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -33,5 +34,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const protectedEmail = process.env.ADMIN_EMAIL?.toLocaleLowerCase();
   const initialUsers = managedUserRows.map(({ account, registrationRequestId }) => ({ id: account.id, name: account.name, email: account.email, role: account.role, accessLevel: account.role === "admin" ? "edit" as const : account.accessLevel, approvalStatus: account.approvalStatus, registrationMethod: account.registrationMethod, registrationRequestId, createdAt: account.createdAt.toISOString(), protected: account.id === currentUser.id || account.email.toLocaleLowerCase() === protectedEmail }));
   const canViewExpenses = hasPermission(currentUser, "expenses.view");
-  return <Workspace initialPlots={plotRows.map(plotRowToFeature).map((feature) => plotForExpenseAccess(feature, canViewExpenses))} initialCategories={categoryRowsToRecord(categoryRows)} initialPlotStatuses={statusRows} initialUsers={initialUsers} initialSection={initialSection} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role, accessLevel: currentUser.accessLevel, locale: normalizeAppLocale(currentUser.locale) }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
+  const initialResultStatusProgress = resultProgressRows.map((entry) => ({ resultType: entry.resultType, resultNumber: entry.resultNumber, statusId: entry.statusId, completedAt: entry.completedAt.toISOString(), cost: canViewExpenses && entry.cost !== null ? Number(entry.cost) : null }));
+  return <Workspace initialPlots={plotRows.map(plotRowToFeature).map((feature) => plotForExpenseAccess(feature, canViewExpenses))} initialCategories={categoryRowsToRecord(categoryRows)} initialPlotStatuses={statusRows} initialResultStatusProgress={initialResultStatusProgress} initialUsers={initialUsers} initialSection={initialSection} user={{ name: currentUser.name, email: currentUser.email, role: currentUser.role, accessLevel: currentUser.accessLevel, locale: normalizeAppLocale(currentUser.locale) }} googleEnabled={googleEnabled} workspace={workspace} testWorkspaceEnabled={testWorkspaceEnabled} />;
 }

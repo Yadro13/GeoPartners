@@ -22,11 +22,12 @@ import { NotificationPanel } from "./NotificationPanel";
 import { LocalePreferenceSync } from "@/components/LocalePreferenceSync";
 import type { BaseMapId, PlotFeature, WorkspaceActions, WorkspaceSection, WorkspaceUser } from "./types";
 import type { ManagedUser } from "@/components/admin/UserManagementTable";
+import { resultProgressContextKey, type ResultStatusProgress } from "@/lib/result-status-progress";
 import "./workspace.css";
 
 type Modal = { type: "add" } | { type: "edit" | "stages" | "documents" | "card"; plot: PlotFeature } | { type: "import" | "notifications" } | null;
 
-export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, initialUsers = [], initialSection = "map", user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; initialUsers?: ManagedUser[]; initialSection?: WorkspaceSection; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
+export function Workspace({ initialPlots, initialCategories, initialPlotStatuses, initialResultStatusProgress = [], initialUsers = [], initialSection = "map", user, googleEnabled = false, preview = false, workspace = "production", testWorkspaceEnabled = false }: { initialPlots?: PlotFeature[]; initialCategories?: Record<string, CategoryDefinition>; initialPlotStatuses?: PlotStatusDefinition[]; initialResultStatusProgress?: ResultStatusProgress[]; initialUsers?: ManagedUser[]; initialSection?: WorkspaceSection; user?: WorkspaceUser; googleEnabled?: boolean; preview?: boolean; workspace?: DataWorkspace; testWorkspaceEnabled?: boolean }) {
   const t = useTranslations("workspace");
   const isMobile = useMediaQuery("(max-width: 899px), (pointer: coarse) and (max-width: 1100px)");
   const [previewSnapshot] = useState(() => readPreviewSnapshot(preview));
@@ -34,6 +35,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   const [plots, setPlots] = useState<PlotFeature[]>(startingPlots);
   const [categories, setCategories] = useState<Record<string, CategoryDefinition>>(categoriesWithDefaults(previewSnapshot?.categories ?? initialCategories ?? {}));
   const [plotStatuses, setPlotStatuses] = useState<PlotStatusDefinition[]>(previewSnapshot?.plotStatuses ?? initialPlotStatuses ?? defaultPlotStatuses);
+  const [resultStatusEntries, setResultStatusEntries] = useState<ResultStatusProgress[]>(previewSnapshot?.resultStatusProgress ?? initialResultStatusProgress);
   const [selectedId, setSelectedId] = useState<string | null>(startingPlots[1]?.properties.id ?? startingPlots[0]?.properties.id ?? null);
   const [query, setQuery] = useState("");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>(initialSection);
@@ -44,8 +46,8 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
   const canEditPlots = hasPermission(currentUser, "plots.create") && hasPermission(currentUser, "plots.update"); const canDeletePlots = hasPermission(currentUser, "plots.delete"); const canImport = hasPermission(currentUser, "imports.run"); const canManageCategories = hasPermission(currentUser, "categories.manage"); const canManageStatuses = hasPermission(currentUser, "statuses.manage"); const canRestoreVersions = hasPermission(currentUser, "versions.restore"); const canManageWorkspaces = hasPermission(currentUser, "workspaces.manage"); const canViewExpenses = hasPermission(currentUser, "expenses.view"); const canManageExpenses = hasPermission(currentUser, "expenses.manage");
 
   useEffect(() => {
-    if (preview) localStorage.setItem("geopartners-preview", JSON.stringify({ plots, categories, plotStatuses, baseMap }));
-  }, [baseMap, categories, plotStatuses, plots, preview]);
+    if (preview) localStorage.setItem("geopartners-preview", JSON.stringify({ plots, categories, plotStatuses, resultStatusProgress: resultStatusEntries, baseMap }));
+  }, [baseMap, categories, plotStatuses, plots, preview, resultStatusEntries]);
 
   useEffect(() => {
     if (!toast) return;
@@ -121,15 +123,18 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
         if (!Array.isArray(body)) throw new Error(t("invalidStatusDirectory"));
         saved = body as PlotStatusDefinition[];
       }
-      const nextById = new Map(saved.map((item) => [item.id, item.name]));
+      const plotStatusRows = saved.filter(({ scope }) => scope === "plots");
+      const nextById = new Map(plotStatusRows.map((item) => [item.id, item.name]));
       setPlots((current) => current.map((item) => {
         const statusProgress = (item.properties.statusProgress ?? []).filter((entry) => nextById.has(entry.statusId));
         const completedIds = new Set(statusProgress.map(({ statusId }) => statusId));
-        const status = [...saved].reverse().find(({ id }) => completedIds.has(id))?.name ?? "";
+        const status = [...plotStatusRows].reverse().find(({ id }) => completedIds.has(id))?.name ?? "";
         if (status === item.properties.status && statusProgress.length === (item.properties.statusProgress ?? []).length) return item;
         return { ...item, properties: { ...item.properties, status, statusProgress } };
       }));
       setPlotStatuses(saved);
+      const savedIds = new Set(saved.map(({ id }) => id));
+      setResultStatusEntries((current) => current.filter(({ statusId }) => savedIds.has(statusId)));
       setToast(t("statusDirectorySaved"));
       return saved;
     } catch (reason) {
@@ -137,6 +142,21 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
       return null;
     }
   }, [canManageStatuses, preview, t]);
+
+  const persistResultStatuses = useCallback(async (resultType: ResultStatusProgress["resultType"], resultNumber: string, progress: ResultStatusProgress[]) => {
+    if (!canEditPlots) throw new Error(t("readOnlyNote"));
+    let saved = progress;
+    if (!preview) {
+      const response = await fetch("/api/result-status-progress", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ resultType, resultNumber, progress }) });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error ?? t("plotSaveFailed"));
+      saved = body as ResultStatusProgress[];
+    }
+    const contextKey = resultProgressContextKey(resultType, resultNumber);
+    setResultStatusEntries((current) => [...current.filter((entry) => resultProgressContextKey(entry.resultType, entry.resultNumber) !== contextKey), ...saved]);
+    setModal(null);
+    setToast(t("changesSaved"));
+  }, [canEditPlots, preview, t]);
 
   const importPlots = async (result: ImportResult) => {
     const mergedCategories = categoriesWithDefaults({ ...categories, ...result.categories });
@@ -190,7 +210,7 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
     await importPlots(combined);
   };
 
-  const exportGeoJson = useCallback(() => downloadText(JSON.stringify(toFeatureCollection(plots, categories), null, 2), "geopartners-data.geojson", "application/geo+json"), [categories, plots]);
+  const exportGeoJson = useCallback(() => downloadText(JSON.stringify(toFeatureCollection(plots, categories, resultStatusEntries), null, 2), "geopartners-data.geojson", "application/geo+json"), [categories, plots, resultStatusEntries]);
   const exportCsv = useCallback(() => downloadText(plotsToCsv(plots, canViewExpenses), "geopartners-plots.csv", "text/csv;charset=utf-8"), [canViewExpenses, plots]);
   const restoreAuditEntry = useCallback(async (id: string) => {
     if (!canRestoreVersions) throw new Error(t("restoreAdminOnly"));
@@ -252,15 +272,15 @@ export function Workspace({ initialPlots, initialCategories, initialPlotStatuses
 
   if (isMobile === null) return <main className="workspace-loading" aria-live="polite"><span className="workspace-loading__mark">GP</span><span>{t("preparing")}</span></main>;
 
-  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, plotStatuses, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, canViewExpenses, canManageExpenses, managedUsers: initialUsers, actions };
+  const sharedProps = { plots: filteredPlots, selectedPlot, selectedId, query, categories, plotStatuses, resultStatusProgress: resultStatusEntries, activeSection, baseMap, user: currentUser, googleEnabled, preview, workspace, testWorkspaceEnabled, canEditPlots, canViewExpenses, canManageExpenses, managedUsers: initialUsers, actions };
 
   return <><LocalePreferenceSync preferredLocale={currentUser.locale} />{isMobile ? <MobileWorkspace {...sharedProps} /> : <DesktopWorkspace {...sharedProps} />}
     {modal?.type === "add" ? <WorkspaceModal title={t("newPlot")} description={t("newPlotDescription")} onClose={() => setModal(null)} wide><PlotForm plot={null} neighbors={plots} categories={categories} baseMap={baseMap} onSave={(plot, related) => persistPlot(plot, false, related)} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "edit" ? <WorkspaceModal title={t("editPlotTitle")} onClose={() => setModal(null)} wide><PlotForm plot={modal.plot} neighbors={plots.filter(({ properties }) => properties.id !== modal.plot.properties.id)} categories={categories} baseMap={baseMap} onSave={(plot, related) => persistPlot(plot, true, related)} onDelete={canDeletePlots ? () => void removePlot(modal.plot) : undefined} onCancel={() => setModal(null)} /></WorkspaceModal> : null}
-    {modal?.type === "stages" ? <WorkspaceModal title={t("plotStagesTitle")} description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)} wide><PlotStagesForm plot={modal.plot} statuses={plotStatuses} editable={canEditPlots} canManageExpenses={canManageExpenses} onSave={canEditPlots ? (plot) => persistPlot(plot, true) : undefined} onClose={() => setModal(null)} /></WorkspaceModal> : null}
+    {modal?.type === "stages" ? <WorkspaceModal title={t("plotStagesTitle")} description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)} wide><PlotStagesForm plot={modal.plot} statuses={plotStatuses} resultProgress={resultStatusEntries} editable={canEditPlots} canManageExpenses={canManageExpenses} onSavePlot={canEditPlots ? (plot) => persistPlot(plot, true) : undefined} onSaveResult={canEditPlots ? persistResultStatuses : undefined} onClose={() => setModal(null)} /></WorkspaceModal> : null}
     {modal?.type === "import" ? <WorkspaceModal title={t("importTitle")} description={t("importDescription")} onClose={() => setModal(null)} wide><ImportForm onImport={importFiles} onCancel={() => setModal(null)} existingPlots={plots} categories={categories} baseMap={baseMap} /></WorkspaceModal> : null}
     {modal?.type === "documents" ? <WorkspaceModal title={t("plotDocuments")} description={modal.plot.properties.cadastralNumber} onClose={() => setModal(null)}><div className="document-list"><button type="button" onClick={() => downloadText(JSON.stringify(modal.plot, null, 2), `${modal.plot.properties.cadastralNumber.replaceAll(":", "")}.geojson`, "application/geo+json")}><FileText size={20} /><span><strong>{t("plotGeometry")}</strong><small>GeoJSON</small></span><Download size={18} /></button>{modal.plot.properties.documentUrl ? <a href={modal.plot.properties.documentUrl} target="_blank" rel="noreferrer"><FileText size={20} /><span><strong>{modal.plot.properties.documentName ?? t("documents")}</strong><small>PDF</small></span><Download size={18} /></a> : <p>{t("documentMissing")}</p>}</div></WorkspaceModal> : null}
-    {modal?.type === "card" ? <WorkspaceModal title={t("plotCard")} onClose={() => setModal(null)}><PlotDetails plot={modal.plot} categories={categories} plotStatuses={plotStatuses} canViewExpenses={canViewExpenses} onEdit={canEditPlots ? (plot) => setModal({ type: "edit", plot }) : undefined} onOpenStages={(plot) => setModal({ type: "stages", plot })} onDocuments={(plot) => setModal({ type: "documents", plot })} onOpenCard={() => undefined} /></WorkspaceModal> : null}
+    {modal?.type === "card" ? <WorkspaceModal title={t("plotCard")} onClose={() => setModal(null)}><PlotDetails plot={modal.plot} categories={categories} plotStatuses={plotStatuses} resultStatusProgress={resultStatusEntries} canViewExpenses={canViewExpenses} onEdit={canEditPlots ? (plot) => setModal({ type: "edit", plot }) : undefined} onOpenStages={(plot) => setModal({ type: "stages", plot })} onDocuments={(plot) => setModal({ type: "documents", plot })} onOpenCard={() => undefined} /></WorkspaceModal> : null}
     {modal?.type === "notifications" ? <WorkspaceModal title={t("notifications")} onClose={() => setModal(null)}><NotificationPanel isAdmin={currentUser.role === "admin"} preview={preview} /></WorkspaceModal> : null}
     {toast ? <div className="workspace-toast" role="status">{toast}</div> : null}
   </>;
@@ -270,6 +290,6 @@ function readPreviewSnapshot(preview: boolean) {
   if (!preview || typeof window === "undefined") return null;
   const saved = localStorage.getItem("geopartners-preview");
   if (!saved) return null;
-    try { return JSON.parse(saved) as { plots?: PlotFeature[]; categories?: Record<string, CategoryDefinition>; plotStatuses?: PlotStatusDefinition[]; baseMap?: BaseMapId }; }
+    try { return JSON.parse(saved) as { plots?: PlotFeature[]; categories?: Record<string, CategoryDefinition>; plotStatuses?: PlotStatusDefinition[]; resultStatusProgress?: ResultStatusProgress[]; baseMap?: BaseMapId }; }
   catch { localStorage.removeItem("geopartners-preview"); return null; }
 }

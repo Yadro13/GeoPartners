@@ -6,7 +6,8 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { ArrowDown, ArrowUp, CircleCheck, Coins, Download, Eye, EyeOff, FileJson, FileSpreadsheet, FileText, KeyRound, Link2, LogOut, Plus, Printer, Save, Trash2, UserRound } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { CategoryDefinition } from "@/data/demo";
-import type { PlotStatusDefinition } from "@/data/plot-statuses";
+import { plotStatusScopes, statusesForScope, type PlotStatusDefinition, type PlotStatusScope } from "@/data/plot-statuses";
+import type { ResultStatusProgress } from "@/lib/result-status-progress";
 import { exportReportDocx, exportReportPdf, exportResultReportDocx, exportResultReportPdf, printReport, summarizePlots } from "@/lib/report-export";
 import { buildStatusReportRows, exportResultReportXlsx, exportStatusReportXlsx } from "@/lib/status-report-export";
 import { buildResultReportGroups } from "@/lib/result-report";
@@ -50,7 +51,7 @@ function CategorySetting({ id, category, actions, canManage }: { id: string; cat
   </div>;
 }
 
-export function ReportsPanel({ plots, categories, plotStatuses, actions, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; plotStatuses: PlotStatusDefinition[]; actions: WorkspaceActions; canViewExpenses: boolean }) {
+export function ReportsPanel({ plots, categories, plotStatuses, resultStatusProgress, actions, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; plotStatuses: PlotStatusDefinition[]; resultStatusProgress: ResultStatusProgress[]; actions: WorkspaceActions; canViewExpenses: boolean }) {
   const t = useTranslations("panels");
   const format = useFormatter();
   const locale = useLocale();
@@ -58,20 +59,22 @@ export function ReportsPanel({ plots, categories, plotStatuses, actions, canView
   const statusRows = useMemo(() => buildStatusReportRows(plots, categories), [categories, plots]);
   const [reportView, setReportView] = useState<ReportView>("wtg");
   const resultType = reportView === "plots" ? null : reportView;
-  const resultGroups = useMemo(() => resultType ? buildResultReportGroups(plots, categories, resultType) : [], [categories, plots, resultType]);
+  const scopedStatuses = useMemo(() => statusesForScope(plotStatuses, resultType ?? "plots"), [plotStatuses, resultType]);
+  const resultGroups = useMemo(() => resultType ? buildResultReportGroups(plots, categories, resultType, resultStatusProgress) : [], [categories, plots, resultStatusProgress, resultType]);
+  const visibleStageCost = resultType ? resultGroups.reduce((sum, group) => sum + group.totalCost, 0) : summary.totalStageCost;
   const hasReportData = resultType ? resultGroups.length > 0 : statusRows.length > 0;
   const [busy, setBusy] = useState<"xlsx" | "pdf" | "docx" | null>(null);
   const run = async (type: "xlsx" | "pdf" | "docx") => {
     setBusy(type);
     try {
-      if (type === "xlsx") { if (resultType) await exportResultReportXlsx(resultGroups, resultType, plotStatuses, locale, categories, canViewExpenses); else await exportStatusReportXlsx(statusRows, plotStatuses, locale, canViewExpenses); }
-      else if (type === "pdf") { if (resultType) await exportResultReportPdf(resultGroups, resultType, locale, plotStatuses, canViewExpenses); else await exportReportPdf(summary, locale, plotStatuses, canViewExpenses); }
-      else { if (resultType) await exportResultReportDocx(resultGroups, resultType, locale, plotStatuses, canViewExpenses); else await exportReportDocx(summary, locale, plotStatuses, canViewExpenses); }
+      if (type === "xlsx") { if (resultType) await exportResultReportXlsx(resultGroups, resultType, scopedStatuses, locale, categories, canViewExpenses); else await exportStatusReportXlsx(statusRows, scopedStatuses, locale, canViewExpenses); }
+      else if (type === "pdf") { if (resultType) await exportResultReportPdf(resultGroups, resultType, locale, scopedStatuses, canViewExpenses); else await exportReportPdf(summary, locale, scopedStatuses, canViewExpenses); }
+      else { if (resultType) await exportResultReportDocx(resultGroups, resultType, locale, scopedStatuses, canViewExpenses); else await exportReportDocx(summary, locale, scopedStatuses, canViewExpenses); }
     } finally { setBusy(null); }
   };
   return <section className="workspace-page report-page"><header className="workspace-page__header report-page__header"><div><span className="eyebrow">{t("currentSet")}</span><h1>{t("summaryReport")}</h1></div><ReportViewSelector view={reportView} onViewChange={setReportView} /><div className="page-actions"><button className="command-button" type="button" onClick={actions.exportCsv}><FileSpreadsheet size={17} />CSV</button><button className="command-button" type="button" onClick={actions.exportGeoJson}><FileJson size={17} />GeoJSON</button></div></header>
-    <div className="report-metrics"><article><strong>{format.number(summary.count)}</strong><span>{t("visiblePlots")}</span></article><article><strong>{format.number(summary.totalArea, { maximumFractionDigits: 4 })}</strong><span>{t("totalHectares")}</span></article><article><strong>{format.number(summary.byCategory.length)}</strong><span>{t("activeCategories")}</span></article>{canViewExpenses ? <article><strong>{format.number(summary.totalStageCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</strong><span><Coins size={14} />{t("totalStageExpenses")}</span></article> : null}</div>
-    <StatusReport plots={plots} categories={categories} statuses={plotStatuses} view={reportView} canViewExpenses={canViewExpenses} />
+    <div className="report-metrics"><article><strong>{format.number(summary.count)}</strong><span>{t("visiblePlots")}</span></article><article><strong>{format.number(summary.totalArea, { maximumFractionDigits: 4 })}</strong><span>{t("totalHectares")}</span></article><article><strong>{format.number(summary.byCategory.length)}</strong><span>{t("activeCategories")}</span></article>{canViewExpenses ? <article><strong>{format.number(visibleStageCost, { style: "currency", currency: "UAH", maximumFractionDigits: 2 })}</strong><span><Coins size={14} />{t("totalStageExpenses")}</span></article> : null}</div>
+    <StatusReport plots={plots} categories={categories} statuses={scopedStatuses} resultStatusProgress={resultStatusProgress} view={reportView} canViewExpenses={canViewExpenses} />
     <div className="report-layout"><section><h2>{t("byCategory")}</h2><div className="report-category-list">{summary.byCategory.map((item) => <div key={item.id}><span className="category-line__swatch" style={{ background: item.color }} /><strong>{item.name}</strong><span>{t("pieces", { count: item.count })}</span><span>{t("hectares", { area: format.number(item.area, { maximumFractionDigits: 4 }) })}</span></div>)}</div></section>
       <aside className="report-export"><h2>{t("saveReport")}</h2><p>{t("reportNote")}</p><button className="command-button command-button--primary" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("xlsx")}><FileSpreadsheet size={17} />{busy === "xlsx" ? t("generating") : t("downloadXlsx")}</button><button className="command-button" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("pdf")}><Download size={17} />{busy === "pdf" ? t("generating") : t("downloadPdf")}</button><button className="command-button" disabled={Boolean(busy) || !hasReportData} type="button" onClick={() => run("docx")}><FileText size={17} />{busy === "docx" ? t("generating") : t("downloadDocx")}</button><button className="command-button" disabled={!hasReportData} type="button" onClick={printReport}><Printer size={17} />{t("print")}</button></aside>
     </div>
@@ -95,6 +98,7 @@ function passwordErrorKey(error: { code?: string }) {
   if (error.code === "PASSWORD_TOO_LONG") return "passwordTooLong";
   return "passwordChangeFailed";
 }
+
 
 export function ProfilePanel({ user, googleEnabled, preview, workspace, testWorkspaceEnabled, plotStatuses, actions }: { user: WorkspaceUser; googleEnabled: boolean; preview: boolean; workspace: DataWorkspace; testWorkspaceEnabled: boolean; plotStatuses: PlotStatusDefinition[]; actions: WorkspaceActions }) {
   const t = useTranslations("panels");
@@ -169,14 +173,18 @@ function PlotStatusSettings({ statuses, actions }: { statuses: PlotStatusDefinit
   const t = useTranslations("panels");
   const common = useTranslations("common");
   const [draft, setDraft] = useState(statuses);
+  const [scope, setScope] = useState<PlotStatusScope>("wtg");
   const [saving, setSaving] = useState(false);
+  const scopedDraft = statusesForScope(draft, scope);
+
+  const replaceScope = (nextScope: PlotStatusDefinition[]) => setDraft((current) => plotStatusScopes.flatMap((itemScope) => itemScope === scope ? nextScope : statusesForScope(current, itemScope)));
 
   const move = (index: number, offset: -1 | 1) => {
     const destination = index + offset;
-    if (destination < 0 || destination >= draft.length) return;
-    const next = [...draft];
+    if (destination < 0 || destination >= scopedDraft.length) return;
+    const next = [...scopedDraft];
     [next[index], next[destination]] = [next[destination], next[index]];
-    setDraft(next);
+    replaceScope(next);
   };
   const save = async () => {
     setSaving(true);
@@ -185,7 +193,7 @@ function PlotStatusSettings({ statuses, actions }: { statuses: PlotStatusDefinit
     setSaving(false);
   };
 
-  return <section className="plot-status-settings"><header><div><span className="eyebrow">{t("currentDatabaseDirectory")}</span><h2>{t("plotStatuses")}</h2></div><button className="command-button" type="button" onClick={() => setDraft((current) => [...current, { id: `status_${crypto.randomUUID()}`, name: nextStatusName(current, (number) => t("newStatus", { number })) }])}><Plus size={17} />{t("addStatus")}</button></header><div className="plot-status-list">{draft.map((item, index) => <div className="plot-status-row" key={item.id}><span className="plot-status-row__order">{index + 1}</span><textarea aria-label={t("statusName", { number: index + 1 })} value={item.name} maxLength={160} rows={2} onChange={(event) => setDraft((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, name: event.target.value } : candidate))} /><button className="icon-button" type="button" disabled={index === 0} onClick={() => move(index, -1)} title={t("moveUp")} aria-label={t("moveStatusUp", { name: item.name })}><ArrowUp size={17} /></button><button className="icon-button" type="button" disabled={index === draft.length - 1} onClick={() => move(index, 1)} title={t("moveDown")} aria-label={t("moveStatusDown", { name: item.name })}><ArrowDown size={17} /></button><button className="icon-button" type="button" onClick={() => setDraft((current) => current.filter(({ id }) => id !== item.id))} title={t("deleteStatus")} aria-label={t("deleteNamedStatus", { name: item.name })}><Trash2 size={17} /></button></div>)}</div><footer><small>{t("statusOrderHint")}</small><button className="command-button command-button--primary" disabled={saving} type="button" onClick={() => void save()}><Save size={17} />{saving ? common("saving") : t("saveDirectory")}</button></footer></section>;
+  return <section className="plot-status-settings"><header><div><span className="eyebrow">{t("currentDatabaseDirectory")}</span><h2>{t("plotStatuses")}</h2></div><button className="command-button" type="button" onClick={() => replaceScope([...scopedDraft, { id: `${scope}_status_${crypto.randomUUID()}`, name: nextStatusName(scopedDraft, (number) => t("newStatus", { number })), scope }])}><Plus size={17} />{t("addStatus")}</button></header><label className="plot-status-settings__scope"><span>{t("statusProcess")}</span><select value={scope} onChange={(event) => setScope(event.target.value as PlotStatusScope)}>{plotStatusScopes.map((itemScope) => <option key={itemScope} value={itemScope}>{t(`statusScope_${itemScope}`)}</option>)}</select></label><div className="plot-status-list">{scopedDraft.map((item, index) => <div className="plot-status-row" key={item.id}><span className="plot-status-row__order">{index + 1}</span><textarea aria-label={t("statusName", { number: index + 1 })} value={item.name} maxLength={160} rows={2} onChange={(event) => setDraft((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, name: event.target.value } : candidate))} /><button className="icon-button" type="button" disabled={index === 0} onClick={() => move(index, -1)} title={t("moveUp")} aria-label={t("moveStatusUp", { name: item.name })}><ArrowUp size={17} /></button><button className="icon-button" type="button" disabled={index === scopedDraft.length - 1} onClick={() => move(index, 1)} title={t("moveDown")} aria-label={t("moveStatusDown", { name: item.name })}><ArrowDown size={17} /></button><button className="icon-button" type="button" onClick={() => replaceScope(scopedDraft.filter(({ id }) => id !== item.id))} title={t("deleteStatus")} aria-label={t("deleteNamedStatus", { name: item.name })}><Trash2 size={17} /></button></div>)}</div><footer><small>{t("statusOrderHint")}</small><button className="command-button command-button--primary" disabled={saving} type="button" onClick={() => void save()}><Save size={17} />{saving ? common("saving") : t("saveDirectory")}</button></footer></section>;
 }
 
 function nextStatusName(statuses: PlotStatusDefinition[], formatName: (number: number) => string) {

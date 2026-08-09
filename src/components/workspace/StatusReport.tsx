@@ -10,6 +10,7 @@ import type { PlotResultType } from "@/lib/plot-result-links";
 import { formatPlotSpecialDetails } from "@/lib/plot-special-fields";
 import { isAppLocale } from "@/i18n/config";
 import { buildResultReportGroups, resultGroupPlots, type ResultReportGroup } from "@/lib/result-report";
+import type { ResultStatusProgress } from "@/lib/result-status-progress";
 import type { PlotFeature } from "./types";
 
 type MatrixMode = "progress" | "dates" | "expenses";
@@ -29,13 +30,13 @@ export function ReportViewSelector({ view, onViewChange }: { view: ReportView; o
   return <div className="status-report__view"><span>{t("reportView")}</span><div className="segmented-control" role="group" aria-label={t("reportView")}>{reportViews.map((value) => <button aria-pressed={view === value} data-active={view === value} key={value} type="button" onClick={() => onViewChange(value)}>{t(viewLabelKeys[value])}</button>)}</div></div>;
 }
 
-export function StatusReport({ plots, categories, statuses, view, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; view: ReportView; canViewExpenses: boolean }) {
+export function StatusReport({ plots, categories, statuses, resultStatusProgress, view, canViewExpenses }: { plots: PlotFeature[]; categories: Record<string, CategoryDefinition>; statuses: PlotStatusDefinition[]; resultStatusProgress: ResultStatusProgress[]; view: ReportView; canViewExpenses: boolean }) {
   const t = useTranslations("reports");
   const format = useFormatter();
   const locale = useLocale();
   const allRows = useMemo(() => buildStatusReportRows(plots, categories), [categories, plots]);
   const resultType = view === "plots" ? null : view;
-  const allResultGroups = useMemo(() => resultType ? buildResultReportGroups(plots, categories, resultType) : [], [categories, plots, resultType]);
+  const allResultGroups = useMemo(() => resultType ? buildResultReportGroups(plots, categories, resultType, resultStatusProgress) : [], [categories, plots, resultStatusProgress, resultType]);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("all");
   const [statusId, setStatusId] = useState("all");

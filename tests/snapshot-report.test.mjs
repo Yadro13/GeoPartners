@@ -25,6 +25,21 @@ test("does not invent deltas for the first historical snapshot", () => {
   assert(kpis.statuses.every(({ delta }) => delta === null));
 });
 
+test("counts result stages independently from plot stages", () => {
+  const current = buildWorkspaceSnapshotPayload({
+    workspace: "production",
+    capturedAt: "2026-08-07T20:00:00.000Z",
+    categories,
+    plotStatuses: [...statuses, { id: "road-one", name: "Road first", scope: "road" }],
+    resultStatusProgress: [
+      { resultType: "road", resultNumber: "1", statusId: "road-one", completedAt: "2026-08-07T12:00:00.000Z", cost: null },
+      { resultType: "road", resultNumber: "2", statusId: "road-one", completedAt: "2026-08-07T13:00:00.000Z", cost: null },
+    ],
+    plots: [],
+  });
+  assert.equal(buildSnapshotKpis(current, null).statuses.find(({ id }) => id === "road-one")?.current, 2);
+});
+
 test("Kyiv Friday schedule follows summer and winter UTC offsets", () => {
   assert.deepEqual(getKyivSnapshotSchedule(new Date("2026-08-07T20:00:00.000Z")), { due: true, scheduleKey: "2026-08-07" });
   assert.deepEqual(getKyivSnapshotSchedule(new Date("2026-12-04T21:00:00.000Z")), { due: true, scheduleKey: "2026-12-04" });

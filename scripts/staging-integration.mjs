@@ -452,11 +452,13 @@ async function run() {
   const editor = await databaseUser(userEmail);
   assert(editor?.accessLevel === "edit", "Administrator did not grant plot editing access.");
   const statusCatalog = await request("/api/plot-statuses", { jar: userJar });
-  assert(statusCatalog.payload[0]?.name === "обрана ділянка як варіант", "Initial plot status order is invalid.");
+  const plotStatusCatalog = statusCatalog.payload.filter((item) => item.scope === "plots");
+  const roadStatusCatalog = statusCatalog.payload.filter((item) => item.scope === "road");
+  assert(plotStatusCatalog[0]?.name === "обрана ділянка як варіант" && roadStatusCatalog.length === 23, "Scoped status directories are incomplete or out of order.");
   await request("/api/plot-statuses", { method: "PUT", jar: userJar, expected: [403], json: statusCatalog.payload });
-  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: statusName }] });
+  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: statusName, scope: "plots" }] });
   const administratorProgress = [
-    { statusId: statusCatalog.payload[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 0 },
+    { statusId: plotStatusCatalog[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 0 },
     { statusId, completedAt: "2026-07-24T11:30:00.000Z", cost: 1250.5 },
   ];
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: adminJar, json: testPlot("Stage expenses assigned by E2E administrator", statusName, administratorProgress) });
@@ -465,7 +467,7 @@ async function run() {
   assert(editorVisibleProgress?.length === 2 && editorVisibleProgress.every((item) => !("cost" in item)), "Editor API response leaked stage expenses.");
   const completedAt = "2026-07-25T11:30:00.000Z";
   const editorProgress = [
-    { statusId: statusCatalog.payload[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 999999 },
+    { statusId: plotStatusCatalog[0].id, completedAt: "2026-07-22T09:30:00.000Z", cost: 999999 },
     { statusId, completedAt, cost: 999999 },
   ];
   await request(`/api/plots/${encodeURIComponent(plotId)}`, { method: "PATCH", jar: userJar, json: testPlot("Stages assigned by E2E editor", statusName, editorProgress) });
@@ -477,15 +479,23 @@ async function run() {
   const administratorProperties = administratorPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
   assert(administratorProperties.statusProgress[0]?.cost === 0 && administratorProperties.statusProgress[1]?.cost === 1250.5, "Editor overwrote administrator-managed stage expenses.");
   const renamedStatus = `${statusName} renamed`;
-  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: renamedStatus }] });
+  await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: [...statusCatalog.payload, { id: statusId, name: renamedStatus, scope: "plots" }] });
   const renamedPlot = await request("/api/plots", { jar: userJar });
   assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.status === renamedStatus, "Status rename was not propagated to the plot.");
   assert(renamedPlot.payload.find((item) => item.properties?.id === plotId)?.properties?.statusProgress?.some((item) => item.statusId === statusId), "Status rename removed plot stage progress.");
   await request("/api/plot-statuses", { method: "PUT", jar: adminJar, json: statusCatalog.payload });
   const clearedPlot = await request("/api/plots", { jar: userJar });
   const clearedProperties = clearedPlot.payload.find((item) => item.properties?.id === plotId)?.properties;
-  assert(clearedProperties?.status === statusCatalog.payload[0].name, "Deleting the latest stage did not fall back to the preceding completed stage.");
+  assert(clearedProperties?.status === plotStatusCatalog[0].name, "Deleting the latest stage did not fall back to the preceding completed stage.");
   assert(!clearedProperties?.statusProgress?.some((item) => item.statusId === statusId), "Deleted status was not removed from plot stage progress.");
+  await request("/api/result-status-progress", { method: "PUT", jar: adminJar, json: { resultType: "road", resultNumber: "E2E-R1", progress: [{ statusId: roadStatusCatalog[0].id, completedAt: "2026-07-26T10:00:00.000Z", cost: 2400 }] } });
+  const editorResultProgress = await request("/api/result-status-progress", { method: "PUT", jar: userJar, json: { resultType: "road", resultNumber: "e2e-r1", progress: [{ statusId: roadStatusCatalog[0].id, completedAt: "2026-07-27T10:00:00.000Z", cost: 999999 }] } });
+  assert(editorResultProgress.payload[0]?.completedAt === "2026-07-27T10:00:00.000Z" && !("cost" in editorResultProgress.payload[0]), "Editor result-stage response leaked expenses or failed to update the date.");
+  const storedResultProgress = await client.query("select cost, completed_at as \"completedAt\" from result_status_progress where workspace = 'sandbox' and result_type = 'road' and result_number = 'e2e-r1' and status_id = $1", [roadStatusCatalog[0].id]);
+  assert(Number(storedResultProgress.rows[0]?.cost) === 2400 && storedResultProgress.rows[0]?.completedAt?.toISOString() === "2026-07-27T10:00:00.000Z", "Editor overwrote protected result expenses or the result context was not persisted.");
+  const editorAudit = await request("/api/audit?limit=100", { jar: userJar });
+  const resultAudit = editorAudit.payload.items?.find((item) => item.action === "result-status-progress.updated");
+  assert(resultAudit && !JSON.stringify(resultAudit.details).includes("2400") && !JSON.stringify(resultAudit.details).includes('"cost"'), "Editor audit response leaked result-stage expenses.");
   const categoryRows = await client.query("select id, name, description, color, visible from category where workspace = 'sandbox' order by id");
   const categoryCatalog = Object.fromEntries(categoryRows.rows.map((item) => [item.id, { name: item.name, description: item.description, color: item.color, visible: item.visible }]));
   await request("/api/categories", {
@@ -549,6 +559,7 @@ async function cleanup() {
         [plotId, userIds],
       );
       await client.query(`delete from audit_log where entity_id = $1 or actor_user_id = any($2::text[])`, [plotId, userIds]);
+      await client.query(`delete from result_status_progress where workspace = 'sandbox' and result_number like 'E2E-%'`);
       await client.query(`delete from plot where workspace = 'sandbox' and id = $1`, [plotId]);
       await client.query(`delete from plot_status where workspace = 'sandbox' and id = $1`, [statusId]);
       await client.query(

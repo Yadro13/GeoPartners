@@ -43,5 +43,11 @@ function withoutExpenseAuditDetails(details: Record<string, unknown>) {
   const changes = Array.isArray(details.changes)
     ? details.changes.map((value) => value === "Етапи та витрати" ? "Етапи" : value)
     : details.changes;
-  return { ...details, changes };
+  return stripExpenseValues({ ...details, changes }) as Record<string, unknown>;
+}
+
+function stripExpenseValues(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripExpenseValues);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([key]) => key !== "cost").map(([key, item]) => [key, stripExpenseValues(item)]));
 }

@@ -14,6 +14,7 @@ export const coreTables = [
   "app_settings",
   "category",
   "plot_status",
+  "result_status_progress",
   "plot",
   "audit_log",
   "plot_version",

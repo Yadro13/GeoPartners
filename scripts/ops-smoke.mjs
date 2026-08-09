@@ -44,6 +44,7 @@ for (const table of [
   "app_settings",
   "category",
   "plot_status",
+  "result_status_progress",
   "plot",
   "audit_log",
   "plot_version",
@@ -75,7 +76,7 @@ assert(currentBackupTables.includes("workspace_snapshot"), "new backups require 
 assert.equal(isKyivSnapshotWindow(new Date("2026-08-07T20:00:00.000Z")), true);
 assert.equal(isKyivSnapshotWindow(new Date("2026-12-04T21:00:00.000Z")), true);
 assert.equal(isKyivSnapshotWindow(new Date("2026-08-07T19:55:00.000Z")), false);
-assert.deepEqual(defaultPlotStatuses.map(({ name }) => name), [
+assert.deepEqual(defaultPlotStatuses.filter(({ scope }) => scope === "plots").map(({ name }) => name), [
   "обрана ділянка як варіант",
   "проведено перемовини з власником",
   "отримана згода власника",

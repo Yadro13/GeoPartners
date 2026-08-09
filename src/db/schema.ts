@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, foreignKey, index, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { CategorySystemRole } from "@/data/demo";
 import type { PlotResultLink } from "@/lib/plot-result-links";
+import type { PlotStatusScope } from "@/data/plot-statuses";
 import type { WorkspaceSnapshotPayload, WorkspaceSnapshotSource } from "@/lib/workspace-snapshot-format";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
@@ -145,6 +146,7 @@ export const plotStatus = pgTable(
   {
     workspace: dataWorkspaceEnum("workspace").default("production").notNull(),
     id: text("id").notNull(),
+    scope: text("scope").$type<PlotStatusScope>().default("plots").notNull(),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -152,8 +154,27 @@ export const plotStatus = pgTable(
   },
   (table) => [
     primaryKey({ name: "plot_status_workspace_id_pk", columns: [table.workspace, table.id] }),
-    uniqueIndex("plot_status_workspace_name_idx").on(table.workspace, table.name),
-    uniqueIndex("plot_status_workspace_sort_idx").on(table.workspace, table.sortOrder),
+    uniqueIndex("plot_status_workspace_scope_name_idx").on(table.workspace, table.scope, table.name),
+    uniqueIndex("plot_status_workspace_scope_sort_idx").on(table.workspace, table.scope, table.sortOrder),
+  ],
+);
+
+export const resultStatusProgress = pgTable(
+  "result_status_progress",
+  {
+    workspace: dataWorkspaceEnum("workspace").default("production").notNull(),
+    resultType: text("result_type").$type<PlotResultLink["type"]>().notNull(),
+    resultNumber: text("result_number").notNull(),
+    statusId: text("status_id").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    cost: numeric("cost", { precision: 14, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "result_status_progress_pk", columns: [table.workspace, table.resultType, table.resultNumber, table.statusId] }),
+    index("result_status_progress_context_idx").on(table.workspace, table.resultType, table.resultNumber),
+    foreignKey({ name: "result_status_progress_status_fk", columns: [table.workspace, table.statusId], foreignColumns: [plotStatus.workspace, plotStatus.id] }).onDelete("cascade"),
   ],
 );
 
