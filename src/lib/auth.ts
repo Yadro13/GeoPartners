@@ -91,6 +91,7 @@ export const auth = betterAuth({
       reviewedAt: { type: "date", required: false, input: false },
       reviewedBy: { type: "string", required: false, input: false },
       locale: { type: "string", defaultValue: "uk", input: false },
+      preferredWorkspace: { type: "string", required: false, input: false },
     },
   },
   databaseHooks: {

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "imports.run")) return NextResponse.json({ error: "Імпорт доступний лише адміністратору." }, { status: 403 });
   const startedAt = Date.now();
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const uploadedKeys: string[] = [];
   try {
     const form = await request.formData(); const files = uploadedImportFiles(form);

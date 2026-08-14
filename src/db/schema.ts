@@ -26,6 +26,7 @@ export const user = pgTable("user", {
   approvalStatus: approvalStatusEnum("approval_status").default("pending").notNull(),
   registrationMethod: registrationMethodEnum("registration_method").default("password").notNull(),
   locale: text("locale").default("uk").notNull(),
+  preferredWorkspace: dataWorkspaceEnum("preferred_workspace"),
   reviewComment: text("review_comment"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   reviewedBy: text("reviewed_by"),

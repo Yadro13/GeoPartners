@@ -16,7 +16,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "plots.update")) return NextResponse.json({ error: "Недостатньо прав для редагування ділянки." }, { status: 403 });
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const { id } = await params; let feature = parsePlotFeature(await request.json());
     if (feature.properties.id !== id) return NextResponse.json({ error: "ID ділянки не збігається." }, { status: 400 });
     const allRows = await db.select().from(plot).where(eq(plot.workspace, workspace)); const current = allRows.find((row) => row.id === id);
@@ -46,7 +46,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "plots.delete")) return NextResponse.json({ error: "Видалення ділянок доступне лише адміністратору." }, { status: 403 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const { id } = await params; const [record] = await db.select().from(plot).where(and(eq(plot.workspace, workspace), eq(plot.id, id))).limit(1);
   if (!record) return NextResponse.json({ error: "Ділянку не знайдено." }, { status: 404 });
   const feature = plotRowToFeature(record);

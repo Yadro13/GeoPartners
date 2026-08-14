@@ -225,7 +225,7 @@ async function mailpitText(id) {
 
 async function databaseUser(email) {
   const result = await client.query(
-    `select id, role, access_level as "accessLevel", approval_status as "approvalStatus", email_verified as "emailVerified", locale
+    `select id, role, access_level as "accessLevel", approval_status as "approvalStatus", email_verified as "emailVerified", locale, preferred_workspace as "preferredWorkspace"
        from "user" where email = $1`,
     [email],
   );
@@ -397,8 +397,19 @@ async function run() {
   assert((await mailpitText(decisionNotice.ID)).includes(reviewComment), "Approval email does not include the administrator comment.");
   logStep("atomic administrator approval, recorded reviewer, result page and decision email passed");
 
-  await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
+  const defaultWorkspace = await request("/api/workspace", { jar: userJar });
+  assert(defaultWorkspace.payload.workspace === "sandbox" && defaultWorkspace.payload.testWorkspaceEnabled === true, "A user without a saved choice did not start in the enabled test database.");
+  await request("/api/workspace", { method: "POST", jar: userJar, json: { workspace: "production" } });
+  const reloggedUserJar = await signIn(userEmail);
+  const restoredWorkspace = await request("/api/workspace", { jar: reloggedUserJar });
+  assert(restoredWorkspace.payload.workspace === "production", "The user's production database choice was not restored after sign-in.");
+  assert((await databaseUser(userEmail))?.preferredWorkspace === "production", "The user's database choice was not persisted in the profile.");
+  const independentAdminWorkspace = await request("/api/workspace", { jar: adminJar });
+  assert(independentAdminWorkspace.payload.workspace === "sandbox", "One user's database choice leaked into another user's profile.");
   await request("/api/workspace", { method: "POST", jar: userJar, json: { workspace: "sandbox" } });
+  logStep("test-database default and per-user last choice persistence passed");
+
+  await request("/api/workspace", { method: "POST", jar: adminJar, json: { workspace: "sandbox" } });
   await request("/api/plots", { method: "POST", jar: adminJar, expected: [201], json: testPlot() });
   const sandboxPlots = await request("/api/plots", { jar: userJar });
   assert(Array.isArray(sandboxPlots.payload) && sandboxPlots.payload.some((item) => item.properties?.id === plotId), "User cannot read the staging E2E plot.");

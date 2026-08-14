@@ -15,7 +15,7 @@ export async function PUT(request: Request) {
   if (!hasPermission(currentUser, "plots.update")) return NextResponse.json({ error: "Недостатньо прав для редагування етапів." }, { status: 403 });
 
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const body = await request.json() as { resultType?: PlotResultType; resultNumber?: string; progress?: unknown[] };
     const requestedNumber = typeof body.resultNumber === "string" ? body.resultNumber.trim().replace(/\s+/g, " ").slice(0, 80) : "";
     const parsed = parseResultStatusProgress((body.progress ?? []).map((entry) => ({ ...(entry && typeof entry === "object" ? entry : {}), resultType: body.resultType, resultNumber: requestedNumber })));

@@ -16,7 +16,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!hasPermission(currentUser, "versions.restore")) return NextResponse.json({ error: "Відновлення версій доступне лише адміністратору." }, { status: 403 });
 
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const { id } = await params;
     const [record] = await db.select({ entry: auditLog, version: plotVersion }).from(auditLog).innerJoin(plotVersion, and(eq(plotVersion.auditLogId, auditLog.id), eq(plotVersion.workspace, workspace))).where(and(eq(auditLog.workspace, workspace), eq(auditLog.id, id))).limit(1);
     if (!record) return NextResponse.json({ error: "Версію для відновлення не знайдено." }, { status: 404 });

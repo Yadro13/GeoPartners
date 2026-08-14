@@ -18,7 +18,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!hasPermission(currentUser, "snapshots.view")) return NextResponse.json({ error: "Історичні знімки доступні лише адміністратору." }, { status: 403 });
   const parsedId = idSchema.safeParse((await context.params).id);
   if (!parsedId.success) return NextResponse.json({ error: "Некоректний ідентифікатор знімка." }, { status: 400 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const [snapshot] = await db.select().from(workspaceSnapshot).where(and(eq(workspaceSnapshot.id, parsedId.data), eq(workspaceSnapshot.workspace, workspace))).limit(1);
   if (!snapshot) return NextResponse.json({ error: "Знімок не знайдено." }, { status: 404 });
   if (hashWorkspaceSnapshot(snapshot.payload) !== snapshot.contentHash) return NextResponse.json({ error: "Контроль цілісності знімка не пройдено." }, { status: 409 });

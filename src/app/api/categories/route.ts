@@ -11,7 +11,7 @@ export async function PUT(request: Request) {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "categories.manage")) return NextResponse.json({ error: "Недостатньо прав для керування категоріями." }, { status: 403 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const value = await request.json() as Record<string, CategoryDefinition>;
   const existingRows = await db.select({ id: category.id, systemRole: category.systemRole }).from(category).where(eq(category.workspace, workspace));
   const existingById = new Map(existingRows.map((item) => [item.id, item]));

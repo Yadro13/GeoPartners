@@ -14,7 +14,7 @@ import { clearPlotExpenses, plotForExpenseAccess } from "@/lib/plot-expenses";
 export async function GET() {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const canViewExpenses = hasPermission(currentUser, "expenses.view");
   return NextResponse.json((await db.select().from(plot).where(eq(plot.workspace, workspace))).map(plotRowToFeature).map((feature) => plotForExpenseAccess(feature, canViewExpenses)));
 }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "plots.create")) return NextResponse.json({ error: "Недостатньо прав для створення ділянки." }, { status: 403 });
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     let feature = parsePlotFeature(await request.json());
     if (!hasPermission(currentUser, "expenses.manage")) feature = clearPlotExpenses(feature);
     const statusState = await resolvePlotStatusProgress(workspace, feature.properties.statusProgress ?? [], feature.properties.status ?? "");

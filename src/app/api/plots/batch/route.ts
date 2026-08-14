@@ -22,7 +22,7 @@ export async function PATCH(request: Request) {
     const features = payload.map(parsePlotFeature);
     if (new Set(features.map(({ properties }) => properties.id)).size !== features.length) return NextResponse.json({ error: "Пакет містить дублікати ID ділянок." }, { status: 400 });
 
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const allRows = await db.select().from(plot).where(eq(plot.workspace, workspace));
     const currentById = new Map(allRows.map((row) => [row.id, row]));
     if (features.some(({ properties }) => !currentById.has(properties.id))) return NextResponse.json({ error: "Одну з пов'язаних ділянок не знайдено." }, { status: 404 });

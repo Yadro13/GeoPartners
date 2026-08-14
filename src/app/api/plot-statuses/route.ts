@@ -11,7 +11,7 @@ import { parsePlotStatusDefinitions } from "@/lib/plot-status-directory";
 export async function GET() {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const rows = await db.select({ id: plotStatus.id, name: plotStatus.name, scope: plotStatus.scope }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.scope), asc(plotStatus.sortOrder));
   return NextResponse.json(rows);
 }
@@ -22,7 +22,7 @@ export async function PUT(request: Request) {
   if (!hasPermission(currentUser, "statuses.manage")) return NextResponse.json({ error: "Керування довідником статусів доступне лише адміністратору." }, { status: 403 });
 
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const entries = parsePlotStatusDefinitions(await request.json());
     await db.transaction(async (tx) => {
       const previous = await tx.select({ id: plotStatus.id, name: plotStatus.name, scope: plotStatus.scope }).from(plotStatus).where(eq(plotStatus.workspace, workspace)).orderBy(asc(plotStatus.scope), asc(plotStatus.sortOrder));

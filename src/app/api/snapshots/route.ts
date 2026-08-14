@@ -11,7 +11,7 @@ export async function GET() {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
   if (!hasPermission(currentUser, "snapshots.view")) return NextResponse.json({ error: "Історичні знімки доступні лише адміністратору." }, { status: 403 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const rows = await db.select().from(workspaceSnapshot).where(eq(workspaceSnapshot.workspace, workspace)).orderBy(desc(workspaceSnapshot.capturedAt)).limit(100);
   return NextResponse.json({ items: rows.map(snapshotMetadata) }, { headers: { "cache-control": "no-store" } });
 }

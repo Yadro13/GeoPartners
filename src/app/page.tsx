@@ -20,7 +20,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const currentUser = await getCurrentUser();
   if (!currentUser) redirect("/sign-in");
   if (currentUser.approvalStatus !== "approved") redirect("/pending");
-  const { workspace, testWorkspaceEnabled } = await getWorkspaceContext();
+  const { workspace, testWorkspaceEnabled } = await getWorkspaceContext(currentUser.preferredWorkspace);
   const [plotRows, categoryRows, statusRows, resultProgressRows, managedUserRows] = await Promise.all([
     db.select().from(plot).where(eq(plot.workspace, workspace)),
     db.select().from(category).where(eq(category.workspace, workspace)),

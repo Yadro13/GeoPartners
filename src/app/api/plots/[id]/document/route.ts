@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
-  const workspace = await getDataWorkspace();
+  const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
   const { id } = await params; const [record] = await db.select({ key: plot.pdfObjectKey, cadastral: plot.cadastralNumber }).from(plot).where(and(eq(plot.workspace, workspace), eq(plot.id, id))).limit(1);
   if (!record?.key) return NextResponse.json({ error: "PDF не прикріплено." }, { status: 404 });
   try {

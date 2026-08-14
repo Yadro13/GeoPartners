@@ -15,7 +15,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!currentUser || currentUser.approvalStatus !== "approved") return NextResponse.json({ error: "Не авторизовано." }, { status: 401 });
 
   try {
-    const workspace = await getDataWorkspace();
+    const workspace = await getDataWorkspace(currentUser.preferredWorkspace);
     const { id } = await params;
     const [record] = await db.select({ entry: auditLog, version: plotVersion }).from(auditLog).innerJoin(plotVersion, and(eq(plotVersion.auditLogId, auditLog.id), eq(plotVersion.workspace, workspace))).where(and(eq(auditLog.workspace, workspace), eq(auditLog.id, id))).limit(1);
     if (!record) return NextResponse.json({ error: "Версію для порівняння не знайдено." }, { status: 404 });
