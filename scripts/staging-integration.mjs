@@ -400,7 +400,10 @@ async function run() {
   const defaultWorkspace = await request("/api/workspace", { jar: userJar });
   assert(defaultWorkspace.payload.workspace === "sandbox" && defaultWorkspace.payload.testWorkspaceEnabled === true, "A user without a saved choice did not start in the enabled test database.");
   await request("/api/workspace", { method: "POST", jar: userJar, json: { workspace: "production" } });
-  const reloggedUserJar = await signIn(userEmail);
+  const reloggedUserJar = new CookieJar();
+  for (const [name, value] of userJar.cookies) {
+    if (name !== "geopartners-data-workspace") reloggedUserJar.cookies.set(name, value);
+  }
   const restoredWorkspace = await request("/api/workspace", { jar: reloggedUserJar });
   assert(restoredWorkspace.payload.workspace === "production", "The user's production database choice was not restored after sign-in.");
   assert((await databaseUser(userEmail))?.preferredWorkspace === "production", "The user's database choice was not persisted in the profile.");
